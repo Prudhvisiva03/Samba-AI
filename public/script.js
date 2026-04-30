@@ -1,0 +1,1754 @@
+// ===== State =====
+let chats = [];
+let currentChatId = null;
+let isMainTyping = false;
+let isMiniTyping = false;
+let currentUser = null;
+let settings = {
+  enterToSend: true,
+  fontSize: 'medium',
+  customInstructions: '',
+  currentModel: 'smart-ai-1',
+  theme: 'dark',
+  unrestrictedMode: false
+};
+
+// ===== DOM Elements =====
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const sidebarOpenBtn = document.getElementById('sidebarOpenBtn');
+const topbar = document.getElementById('topbar');
+const newChatBtn = document.getElementById('newChatBtn');
+const topbarNewChat = document.getElementById('topbarNewChat');
+const chatList = document.getElementById('chatList');
+const chatArea = document.getElementById('chatArea');
+const welcomeScreen = document.getElementById('welcomeScreen');
+const messagesContainer = document.getElementById('messages');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const miniChatToggle = document.getElementById('miniChatToggle');
+const miniChat = document.getElementById('miniChat');
+const miniChatClose = document.getElementById('miniChatClose');
+const miniChatMessages = document.getElementById('miniChatMessages');
+const miniMessageInput = document.getElementById('miniMessageInput');
+const miniSendBtn = document.getElementById('miniSendBtn');
+const contextMenu = document.getElementById('contextMenu');
+const renameChatBtn = document.getElementById('renameChat');
+const deleteChatBtn = document.getElementById('deleteChat');
+const searchInput = document.getElementById('searchChats');
+
+// Modals
+const settingsModal = document.getElementById('settingsModal');
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsClose = document.getElementById('settingsClose');
+const clearAllChatsBtn = document.getElementById('clearAllChats');
+const loginModal = document.getElementById('loginModal');
+const loginClose = document.getElementById('loginClose');
+const loginSubmit = document.getElementById('loginSubmit');
+const loginGuest = document.getElementById('loginGuest');
+const userProfile = document.getElementById('userProfile');
+const userAvatar = document.getElementById('userAvatar');
+const userName = document.getElementById('userName');
+const userEmail = document.getElementById('userEmail');
+
+// Confirm dialog
+const confirmOverlay = document.getElementById('confirmOverlay');
+const confirmMessage = document.getElementById('confirmMessage');
+const confirmCancel = document.getElementById('confirmCancel');
+const confirmDeleteBtn = document.getElementById('confirmDelete');
+let confirmCallback = null;
+
+let contextMenuChatId = null;
+
+// New elements
+const toast = document.getElementById('toast');
+const modelSelectorBtn = document.getElementById('modelSelectorBtn');
+const modelDropdown = document.getElementById('modelDropdown');
+const modelName = document.getElementById('modelName');
+const fontSizeSelect = document.getElementById('fontSizeSelect');
+const enterToSendToggle = document.getElementById('enterToSend');
+const themeSelect = document.getElementById('themeSelect');
+const customInstructionsInput = document.getElementById('customInstructions');
+const exportDataBtn = document.getElementById('exportData');
+const securityModeContainer = document.getElementById('securityModeContainer');
+const unrestrictedModeToggle = document.getElementById('unrestrictedMode');
+
+// ===== API Calls =====
+const API = {
+  async getChats() {
+    const res = await fetch('/api/chats');
+    return res.json();
+  },
+  async createChat() {
+    const res = await fetch('/api/chats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+    return res.json();
+  },
+  async deleteChat(id) {
+    const res = await fetch(`/api/chats/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+  },
+  async renameChat(id, title) {
+    const res = await fetch(`/api/chats/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+    if (!res.ok) throw new Error('Rename failed');
+    return res.json();
+  },
+  async pinChat(id) {
+    const res = await fetch(`/api/chats/${id}/pin`, { method: 'PUT' });
+    return res.json();
+  },
+  async getMessages(chatId) {
+    const res = await fetch(`/api/chats/${chatId}/messages`);
+    return res.json();
+  },
+  async sendMessage(chatId, content, model, customInstructions, unrestrictedMode) {
+    const res = await fetch(`/api/chats/${chatId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, model, customInstructions, unrestrictedMode }) });
+    return res.json();
+  },
+  async getMiniMessages(chatId) {
+    const res = await fetch(`/api/chats/${chatId}/mini-messages`);
+    return res.json();
+  },
+  async sendMiniMessage(chatId, content, unrestrictedMode) {
+    const res = await fetch(`/api/chats/${chatId}/mini-messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, unrestrictedMode }) });
+    return res.json();
+  },
+  async uploadFiles(files) {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+    return res.json();
+  },
+  async clearAllChats() {
+    const res = await fetch('/api/chats', { method: 'DELETE' });
+    if (!res.ok) throw new Error('Clear failed');
+    return res.json();
+  },
+  // Auth
+  async login(email, password) {
+    const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    return res.json();
+  },
+  async loginWithGoogle(credential) {
+    const res = await fetch('/api/auth/google', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ credential }) });
+    return res.json();
+  },
+  async register(name, email, password) {
+    const res = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });
+    return res.json();
+  },
+  async logout() {
+    const res = await fetch('/api/auth/logout', { method: 'POST' });
+    return res.json();
+  },
+  async getMe() {
+    const res = await fetch('/api/auth/me');
+    return res.json();
+  },
+};
+
+// ===== Sidebar =====
+function toggleSidebar() {
+  sidebar.classList.toggle('hidden');
+  sidebarOpenBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
+}
+
+// Set initial state
+sidebarOpenBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
+
+sidebarToggle.addEventListener('click', toggleSidebar);
+sidebarOpenBtn.addEventListener('click', toggleSidebar);
+
+// ===== Date Grouping =====
+function getDateGroup(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const monthAgo = new Date(today);
+  monthAgo.setDate(monthAgo.getDate() - 30);
+
+  if (date >= today) return 'Today';
+  if (date >= yesterday) return 'Yesterday';
+  if (date >= weekAgo) return 'Previous 7 Days';
+  if (date >= monthAgo) return 'Previous 30 Days';
+  return 'Older';
+}
+
+function groupChatsByDate(chatsList) {
+  const groups = {};
+  const order = ['Today', 'Yesterday', 'Previous 7 Days', 'Previous 30 Days', 'Older'];
+
+  chatsList.forEach(chat => {
+    const group = getDateGroup(chat.updated_at);
+    if (!groups[group]) groups[group] = [];
+    groups[group].push(chat);
+  });
+
+  // Return in order
+  return order.filter(g => groups[g]).map(g => ({ label: g, chats: groups[g] }));
+}
+
+// ===== Chat List Rendering =====
+function renderChatList(filter = '') {
+  chatList.innerHTML = '';
+
+  let filteredChats = chats;
+  if (filter) {
+    const q = filter.toLowerCase();
+    filteredChats = chats.filter(c => c.title.toLowerCase().includes(q));
+  }
+
+  if (filteredChats.length === 0 && filter) {
+    chatList.innerHTML = '<div style="padding: 16px 12px; color: var(--text-muted); font-size: 13px; text-align: center;">No chats found</div>';
+    return;
+  }
+
+  const pinned = filteredChats.filter(c => c.pinned);
+  const unpinned = filteredChats.filter(c => !c.pinned);
+
+  // Render pinned group first
+  if (pinned.length > 0) {
+    const pinnedLabel = document.createElement('div');
+    pinnedLabel.className = 'chat-group-label';
+    pinnedLabel.innerHTML = '📌 Pinned';
+    chatList.appendChild(pinnedLabel);
+    pinned.forEach(chat => renderChatItem(chat));
+  }
+
+  // Render remaining by date groups
+  const groups = groupChatsByDate(unpinned);
+  groups.forEach(group => {
+    const label = document.createElement('div');
+    label.className = 'chat-group-label';
+    label.textContent = group.label;
+    chatList.appendChild(label);
+    group.chats.forEach(chat => renderChatItem(chat));
+  });
+}
+
+function renderChatItem(chat) {
+  const item = document.createElement('div');
+  item.className = `chat-item${chat.id === currentChatId ? ' active' : ''}${chat.pinned ? ' pinned' : ''}`;
+  item.dataset.id = chat.id;
+  item.innerHTML = `
+    <span class="chat-item-title">${escapeHtml(chat.title)}</span>
+    ${chat.pinned ? '<span class="pin-badge" title="Pinned">📌</span>' : ''}
+    <button class="chat-item-menu" title="Options">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <circle cx="12" cy="5" r="2"></circle>
+        <circle cx="12" cy="12" r="2"></circle>
+        <circle cx="12" cy="19" r="2"></circle>
+      </svg>
+    </button>
+  `;
+
+  item.addEventListener('click', (e) => {
+    if (e.target.closest('.chat-item-menu')) return;
+    switchChat(chat.id);
+  });
+
+  const menuBtn = item.querySelector('.chat-item-menu');
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    showContextMenu(e, chat.id);
+  });
+
+  chatList.appendChild(item);
+}
+
+// ===== Search =====
+searchInput.addEventListener('input', () => {
+  renderChatList(searchInput.value.trim());
+});
+
+// ===== Context Menu =====
+function showContextMenu(e, chatId) {
+  contextMenuChatId = chatId;
+  contextMenu.classList.add('visible');
+  const x = Math.min(e.clientX, window.innerWidth - 180);
+  const y = Math.min(e.clientY, window.innerHeight - 100);
+  contextMenu.style.left = x + 'px';
+  contextMenu.style.top = y + 'px';
+}
+
+function hideContextMenu() {
+  contextMenu.classList.remove('visible');
+  contextMenuChatId = null;
+}
+
+document.addEventListener('click', (e) => {
+  if (!contextMenu.contains(e.target)) {
+    hideContextMenu();
+  }
+});
+
+const pinChatBtn = document.getElementById('pinChat');
+
+pinChatBtn.addEventListener('click', async () => {
+  const id = contextMenuChatId;
+  hideContextMenu();
+  const updated = await API.pinChat(id);
+  const chat = chats.find(c => c.id === id);
+  if (chat) chat.pinned = updated.pinned;
+  renderChatList(searchInput.value.trim());
+  showToast(updated.pinned ? 'Chat pinned 📌' : 'Chat unpinned');
+});
+
+renameChatBtn.addEventListener('click', () => {
+  hideContextMenu();
+  startRename(contextMenuChatId);
+});
+
+deleteChatBtn.addEventListener('click', () => {
+  const id = contextMenuChatId;
+  hideContextMenu();
+  showConfirm('Are you sure you want to delete this chat? This action cannot be undone.', async () => {
+    try {
+      await API.deleteChat(id);
+      chats = chats.filter(c => c.id !== id);
+      if (currentChatId === id) {
+        currentChatId = null;
+        showWelcome();
+      }
+      renderChatList(searchInput.value.trim());
+    } catch(err) {
+      showToast('Failed to delete chat');
+    }
+  });
+});
+
+// ===== Confirm Dialog =====
+function showConfirm(message, onConfirm, confirmLabel = 'Delete') {
+  confirmMessage.textContent = message;
+  confirmCallback = onConfirm;
+  confirmDeleteBtn.textContent = confirmLabel;
+  confirmOverlay.classList.add('open');
+}
+
+confirmCancel.addEventListener('click', () => {
+  confirmOverlay.classList.remove('open');
+  confirmCallback = null;
+  confirmDeleteBtn.textContent = 'Delete'; // always reset
+});
+
+confirmDeleteBtn.addEventListener('click', async () => {
+  confirmOverlay.classList.remove('open');
+  if (confirmCallback) {
+    await confirmCallback();
+    confirmCallback = null;
+  }
+});
+
+confirmOverlay.addEventListener('click', (e) => {
+  if (e.target === confirmOverlay) {
+    confirmOverlay.classList.remove('open');
+    confirmCallback = null;
+    confirmDeleteBtn.textContent = 'Delete'; // always reset
+  }
+});
+
+// ===== Rename =====
+function startRename(chatId) {
+  const item = chatList.querySelector(`[data-id="${chatId}"]`);
+  if (!item) return;
+  const titleEl = item.querySelector('.chat-item-title');
+  const currentTitle = titleEl.textContent;
+
+  const input = document.createElement('input');
+  input.className = 'chat-item-rename';
+  input.type = 'text';
+  input.value = currentTitle;
+  titleEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  async function finishRename() {
+    const newTitle = input.value.trim() || currentTitle;
+    try {
+      await API.renameChat(chatId, newTitle);
+      const chat = chats.find(c => c.id === chatId);
+      if (chat) chat.title = newTitle;
+      renderChatList(searchInput.value.trim());
+    } catch(err) {
+      showToast('Failed to rename chat');
+      renderChatList(searchInput.value.trim()); // reset to original
+    }
+  }
+
+  input.addEventListener('blur', finishRename);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+    }
+    if (e.key === 'Escape') {
+      input.value = currentTitle;
+      input.blur();
+    }
+  });
+}
+
+// ===== New Chat =====
+async function createNewChat() {
+  const chat = await API.createChat();
+  chats.unshift(chat);
+  currentChatId = chat.id;
+  searchInput.value = '';
+  renderChatList();
+  showWelcome();
+  messageInput.focus();
+  // Reset mini chat
+  if (miniChat.classList.contains('open')) {
+    miniChatMessages.innerHTML = `<div class="mini-welcome"><p>Ask any doubt about the conversation. I'll help you understand!</p></div>`;
+  }
+}
+
+newChatBtn.addEventListener('click', createNewChat);
+topbarNewChat.addEventListener('click', createNewChat);
+
+// ===== Switch Chat =====
+async function switchChat(chatId) {
+  if (chatId === currentChatId) return;
+  currentChatId = chatId;
+  renderChatList(searchInput.value.trim());
+
+  const messages = await API.getMessages(chatId);
+  if (messages.length === 0) {
+    showWelcome();
+  } else {
+    hideWelcome();
+    renderMessages(messages);
+  }
+
+  if (miniChat.classList.contains('open')) {
+    await loadMiniMessages();
+  }
+}
+
+// ===== Welcome Screen =====
+function showWelcome() {
+  welcomeScreen.classList.remove('hidden');
+  messagesContainer.classList.remove('visible');
+  messagesContainer.innerHTML = '';
+}
+
+function hideWelcome() {
+  welcomeScreen.classList.add('hidden');
+  messagesContainer.classList.add('visible');
+}
+
+document.querySelectorAll('.suggestion-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const text = chip.dataset.text;
+    messageInput.value = text;
+    autoResizeTextarea(messageInput);
+    updateSendBtnState();
+    sendMainMessage();
+  });
+});
+
+// ===== Render Messages =====
+function renderMessages(messages) {
+  messagesContainer.innerHTML = '';
+  messages.forEach(msg => {
+    appendMessage(msg.role, msg.content);
+  });
+  scrollToBottom(chatArea);
+}
+
+function enhanceCodeBlocks(containerDiv) {
+  const preEls = containerDiv.querySelectorAll('pre');
+  preEls.forEach(pre => {
+    // If it's already wrapped (e.g. some internal glitch), skip
+    if (pre.parentNode.classList.contains('code-container')) return;
+    
+    const container = document.createElement('div');
+    container.className = 'code-container';
+    
+    const codeEl = pre.querySelector('code');
+    let lang = 'code';
+    if (codeEl && codeEl.className) {
+      const match = codeEl.className.match(/language-(\w+)/);
+      if (match) lang = match[1];
+    }
+
+    const header = document.createElement('div');
+    header.className = 'code-header';
+    header.innerHTML = `
+      <span class="code-lang">${lang}</span>
+      <button class="code-copy-btn" title="Copy code">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span style="font-size: 12px; margin-left: 4px;">Copy Code</span>
+      </button>
+    `;
+
+    const copyBtn = header.querySelector('.code-copy-btn');
+    copyBtn.addEventListener('click', () => {
+      const textToCopy = codeEl ? codeEl.textContent : pre.textContent;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        copyBtn.innerHTML = `
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span style="font-size: 12px; margin-left: 4px;">Copied!</span>
+        `;
+        setTimeout(() => {
+          copyBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span style="font-size: 12px; margin-left: 4px;">Copy Code</span>
+          `;
+        }, 2000);
+      });
+    });
+
+    pre.parentNode.insertBefore(container, pre);
+    container.appendChild(header);
+    container.appendChild(pre);
+  });
+}
+
+function appendMessage(role, content) {
+  const wrapper = document.createElement('div');
+  wrapper.className = `message-wrapper ${role}-wrapper`;
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  const avatarLabel = role === 'user' ? getUserInitial() : 'AI';
+
+  wrapper.dataset.originalContent = content; // store raw content for regenerate
+
+  let mainContent = content;
+  let sugLines = [];
+  
+  if (role === 'assistant' && typeof content === 'string' && content.includes('###_SUGGESTIONS_###')) {
+    const parts = content.split('###_SUGGESTIONS_###');
+    mainContent = parts[0].trim();
+    sugLines = parts[1].split('\n').filter(line => line.trim().startsWith('-'));
+  }
+
+  div.innerHTML = `
+    <div class="message-avatar">${avatarLabel}</div>
+    <div class="message-content">${formatContent(mainContent)}</div>
+  `;
+  wrapper.appendChild(div);
+
+  // Parse code blocks to add header and copy buttons
+  if (role === 'assistant') {
+    enhanceCodeBlocks(div);
+  }
+
+  // Action buttons
+  const actions = document.createElement('div');
+  actions.className = 'message-actions';
+  // Copy button
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'msg-action-btn';
+  copyBtn.title = 'Copy';
+  copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(content).then(() => {
+      copyBtn.classList.add('copied');
+      copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>`;
+      showToast('Copied to clipboard');
+      setTimeout(() => {
+        copyBtn.classList.remove('copied');
+        copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+      }, 2000);
+    });
+  });
+  actions.appendChild(copyBtn);
+
+  // Regenerate button (only for assistant messages)
+  if (role === 'assistant') {
+    const regenBtn = document.createElement('button');
+    regenBtn.className = 'msg-action-btn';
+    regenBtn.title = 'Regenerate';
+    regenBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>`;
+    regenBtn.addEventListener('click', () => regenerateLastResponse());
+    actions.appendChild(regenBtn);
+  }
+
+  wrapper.appendChild(actions);
+
+  if (sugLines.length > 0) {
+    const sugContainer = document.createElement('div');
+    sugContainer.className = 'suggestions-chips-container';
+    // Indent to align with the message text bubble horizontally
+    sugContainer.style.marginLeft = '40px'; 
+    sugLines.forEach(line => {
+      const cleanSug = line.replace(/^- /, '').replace(/\*\*/g, '').trim();
+      const btn = document.createElement('button');
+      btn.className = 'suggestion-chip-btn';
+      btn.textContent = cleanSug;
+      btn.addEventListener('click', () => {
+         const messageInputEl = document.getElementById('messageInput');
+         messageInputEl.value = cleanSug;
+         document.querySelector('.send-btn').click();
+      });
+      sugContainer.appendChild(btn);
+    });
+    wrapper.appendChild(sugContainer);
+  }
+
+  messagesContainer.appendChild(wrapper);
+
+  // Render Mathematical Equations / LaTeX (like ChatGPT)
+  if (typeof renderMathInElement === 'function') {
+    try {
+      renderMathInElement(wrapper, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\(', right: '\\)', display: false }
+        ],
+        throwOnError: false
+      });
+    } catch (e) {
+      console.error('KaTeX rendering error:', e);
+    }
+  }
+}
+
+// ===== Toast =====
+function showToast(text) {
+  toast.textContent = text;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ===== Regenerate =====
+async function regenerateLastResponse() {
+  if (isMainTyping || !currentChatId) return;
+  // Find last user message from DOM
+  const allMsgs = messagesContainer.querySelectorAll('.message-wrapper');
+  let lastUserContent = '';
+  for (let i = allMsgs.length - 1; i >= 0; i--) {
+    const msg = allMsgs[i].querySelector('.message.user');
+    if (msg) {
+      // Read from data-attribute (preserves markdown & file links)
+      lastUserContent = allMsgs[i].dataset.originalContent || msg.querySelector('.message-content').textContent;
+      break;
+    }
+  }
+  if (!lastUserContent) return;
+
+  // Remove last AI message
+  const lastWrapper = allMsgs[allMsgs.length - 1];
+  if (lastWrapper && lastWrapper.querySelector('.message.assistant')) {
+    lastWrapper.remove();
+  }
+
+  isMainTyping = true;
+  showTypingIndicator();
+
+  try {
+    const result = await API.sendMessage(currentChatId, lastUserContent);
+    removeTypingIndicator();
+    isMainTyping = false;
+
+    if (result.error) {
+      appendMessage('assistant', `⚠️ ${result.error}`);
+      scrollToBottom(chatArea);
+      return;
+    }
+
+    appendMessage('assistant', result.aiMessage.content);
+    showToast('Response regenerated');
+  } catch (err) {
+    removeTypingIndicator();
+    isMainTyping = false;
+    appendMessage('assistant', 'Sorry, something went wrong. Please try again.');
+    scrollToBottom(chatArea);
+  }
+}
+
+function getUserInitial() {
+  if (currentUser && currentUser.name) {
+    return currentUser.name.charAt(0).toUpperCase();
+  }
+  return 'G';
+}
+
+function showTypingIndicator() {
+  const div = document.createElement('div');
+  div.className = 'typing-indicator';
+  div.id = 'typingIndicator';
+  div.innerHTML = `
+    <div class="message-avatar" style="background: var(--accent); color: white;">AI</div>
+    <div class="typing-dots">
+      <span></span><span></span><span></span>
+    </div>
+  `;
+  messagesContainer.appendChild(div);
+  scrollToBottom(chatArea);
+}
+
+function removeTypingIndicator() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+// ===== Send Main Message =====
+async function sendMainMessage() {
+  const content = messageInput.value.trim();
+  if ((!content && attachedFiles.length === 0) || isMainTyping) return;
+
+  // Guest limit logic (3 messages max)
+  if (!currentUser) {
+    let guestMessageCount = parseInt(localStorage.getItem('smartai_guest_count') || '0', 10);
+    if (guestMessageCount >= 3) {
+      showToast("Guest limit reached. Please sign in to continue.");
+      loginModal.classList.add('open');
+      return;
+    }
+    localStorage.setItem('smartai_guest_count', guestMessageCount + 1);
+  }
+
+  if (!currentChatId) {
+    const chat = await API.createChat();
+    chats.unshift(chat);
+    currentChatId = chat.id;
+    renderChatList();
+  }
+
+  hideWelcome();
+
+  // Upload files to server if any
+  let uploadedFiles = [];
+  if (attachedFiles.length > 0) {
+    try {
+      const uploadResult = await API.uploadFiles(attachedFiles);
+      uploadedFiles = uploadResult.files || [];
+    } catch (err) {
+      showToast('File upload failed');
+    }
+  }
+
+  // Build message with uploaded file links
+  let fullContent = content;
+  if (uploadedFiles.length > 0) {
+    const fileRefs = uploadedFiles.map(f => {
+      if (f.type && f.type.startsWith('image/')) {
+        return `📎 ![${f.name}](${f.url})`;
+      }
+      return `📎 [${f.name}](${f.url}) (${formatFileSize(f.size)})`;
+    }).join('\n');
+    fullContent = content ? `${fileRefs}\n\n${content}` : fileRefs;
+  }
+
+  messageInput.value = '';
+  autoResizeTextarea(messageInput);
+  attachedFiles = [];
+  renderAttachedFiles();
+  updateSendBtnState();
+
+  appendMessage('user', fullContent);
+  scrollToBottom(chatArea);
+
+  isMainTyping = true;
+  showTypingIndicator();
+
+  try {
+    const result = await API.sendMessage(
+      currentChatId,
+      fullContent,
+      settings.currentModel,
+      settings.customInstructions,
+      settings.unrestrictedMode
+    );
+    removeTypingIndicator();
+    isMainTyping = false;
+
+    if (result.error) {
+      appendMessage('assistant', `⚠️ ${result.error}`);
+      return;
+    }
+
+    appendMessage('assistant', result.aiMessage.content);
+
+    if (result.chat) {
+      const chat = chats.find(c => c.id === currentChatId);
+      if (chat && chat.title !== result.chat.title) {
+        chat.title = result.chat.title;
+        renderChatList(searchInput.value.trim());
+      }
+    }
+  } catch (err) {
+    removeTypingIndicator();
+    isMainTyping = false;
+    appendMessage('assistant', 'Sorry, something went wrong. Please try again.');
+    scrollToBottom(chatArea);
+  }
+}
+
+// ===== Main Input Handlers =====
+messageInput.addEventListener('input', () => {
+  autoResizeTextarea(messageInput);
+  updateSendBtnState();
+});
+
+messageInput.addEventListener('keydown', (e) => {
+  const shouldSendEnter = settings.enterToSend !== false; // default true
+  if (e.key === 'Enter' && !e.shiftKey && shouldSendEnter) {
+    e.preventDefault();
+    sendMainMessage();
+  }
+  if (e.key === 'Enter' && e.ctrlKey && !shouldSendEnter) {
+    e.preventDefault();
+    sendMainMessage();
+  }
+});
+
+sendBtn.addEventListener('click', sendMainMessage);
+
+function updateSendBtnState() {
+  sendBtn.disabled = !messageInput.value.trim() && attachedFiles.length === 0;
+}
+
+// ===== File Upload =====
+const attachBtn = document.getElementById('attachBtn');
+const fileInput = document.getElementById('fileInput');
+const attachedFilesContainer = document.getElementById('attachedFiles');
+let attachedFiles = [];
+
+const attachMenu = document.getElementById('attachMenu');
+const attachPhotoBtn = document.getElementById('attachPhotoBtn');
+const attachDocBtn = document.getElementById('attachDocBtn');
+
+attachBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  attachMenu.classList.toggle('open');
+});
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+  if (attachMenu && attachMenu.classList.contains('open') && !e.target.closest('#attachMenuContainer')) {
+    attachMenu.classList.remove('open');
+  }
+});
+
+attachPhotoBtn.addEventListener('click', () => {
+  fileInput.accept = 'image/*,video/*';
+  fileInput.click();
+  attachMenu.classList.remove('open');
+});
+
+attachDocBtn.addEventListener('click', () => {
+  fileInput.accept = '.txt,.json,.md,.js,.py,.html,.css,.csv,.log,.c,.cpp,.java,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx';
+  fileInput.click();
+  attachMenu.classList.remove('open');
+});
+
+fileInput.addEventListener('change', (e) => {
+  const files = Array.from(e.target.files);
+  files.forEach(file => {
+    if (attachedFiles.length >= 5) {
+      showToast('Maximum 5 files allowed');
+      return;
+    }
+    attachedFiles.push(file);
+  });
+  renderAttachedFiles();
+  updateSendBtnState();
+  fileInput.value = '';
+});
+
+function renderAttachedFiles() {
+  attachedFilesContainer.innerHTML = '';
+  attachedFiles.forEach((file, index) => {
+    const fileEl = document.createElement('div');
+    fileEl.className = 'attached-file';
+
+    const icon = getFileIcon(file.type);
+    const size = formatFileSize(file.size);
+
+    fileEl.innerHTML = `
+      <span>${icon}</span>
+      <span class="attached-file-name">${escapeHtml(file.name)}</span>
+      <span style="color: var(--text-muted); font-size: 11px;">(${size})</span>
+      <button class="attached-file-remove" title="Remove">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    `;
+
+    fileEl.querySelector('.attached-file-remove').addEventListener('click', () => {
+      attachedFiles.splice(index, 1);
+      renderAttachedFiles();
+      updateSendBtnState();
+    });
+
+    attachedFilesContainer.appendChild(fileEl);
+  });
+}
+
+function getFileIcon(mimeType) {
+  if (mimeType.startsWith('image/')) return '🖼';
+  if (mimeType.startsWith('video/')) return '🎬';
+  if (mimeType.startsWith('audio/')) return '🎵';
+  if (mimeType.includes('pdf')) return '📄';
+  if (mimeType.includes('zip') || mimeType.includes('rar')) return '📦';
+  if (mimeType.includes('text') || mimeType.includes('json') || mimeType.includes('xml')) return '📝';
+  return '📎';
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// ===== Mini Chat =====
+miniChatToggle.addEventListener('click', async () => {
+  miniChatToggle.classList.add('hidden');
+  miniChat.classList.add('open');
+  if (currentChatId) {
+    await loadMiniMessages();
+  }
+  miniMessageInput.focus();
+});
+
+miniChatClose.addEventListener('click', () => {
+  miniChat.classList.remove('open');
+  miniChatToggle.classList.remove('hidden');
+});
+
+async function loadMiniMessages() {
+  if (!currentChatId) {
+    miniChatMessages.innerHTML = `<div class="mini-welcome"><p>Start a chat first, then ask your doubts here!</p></div>`;
+    return;
+  }
+
+  const messages = await API.getMiniMessages(currentChatId);
+  if (messages.length === 0) {
+    miniChatMessages.innerHTML = `<div class="mini-welcome"><p>Ask any doubt about the conversation. I'll help you understand!</p></div>`;
+  } else {
+    miniChatMessages.innerHTML = '';
+    messages.forEach(msg => {
+      appendMiniMessage(msg.role, msg.content);
+    });
+    scrollToBottom(miniChatMessages);
+  }
+}
+
+function appendMiniMessage(role, content) {
+  const welcome = miniChatMessages.querySelector('.mini-welcome');
+  if (welcome) welcome.remove();
+
+  const div = document.createElement('div');
+  div.className = `mini-message ${role}`;
+  const avatarLabel = role === 'user' ? getUserInitial() : '?';
+  div.innerHTML = `
+    <div class="mini-message-avatar">${avatarLabel}</div>
+    <div class="mini-message-content">${formatContent(content)}</div>
+  `;
+  
+  if (role === 'assistant') {
+    enhanceCodeBlocks(div);
+  }
+  
+  miniChatMessages.appendChild(div);
+}
+
+function showMiniTyping() {
+  const div = document.createElement('div');
+  div.className = 'mini-typing';
+  div.id = 'miniTypingIndicator';
+  div.innerHTML = `
+    <div class="mini-message-avatar" style="background: var(--accent); color: white; font-size: 10px;">?</div>
+    <div class="mini-typing-dots">
+      <span></span><span></span><span></span>
+    </div>
+  `;
+  miniChatMessages.appendChild(div);
+  scrollToBottom(miniChatMessages);
+}
+
+function removeMiniTyping() {
+  const el = document.getElementById('miniTypingIndicator');
+  if (el) el.remove();
+}
+
+async function sendMiniMessage() {
+  const content = miniMessageInput.value.trim();
+  if (!content || isMiniTyping || !currentChatId) return;
+
+  miniMessageInput.value = '';
+  autoResizeTextarea(miniMessageInput);
+  updateMiniSendBtnState();
+
+  appendMiniMessage('user', content);
+  scrollToBottom(miniChatMessages);
+
+  isMiniTyping = true;
+  showMiniTyping();
+
+  try {
+    const result = await API.sendMiniMessage(currentChatId, content, settings.unrestrictedMode);
+    removeMiniTyping();
+    isMiniTyping = false;
+
+    if (result.error) {
+      appendMiniMessage('assistant', `⚠️ ${result.error}`);
+      scrollToBottom(miniChatMessages);
+      return;
+    }
+
+    appendMiniMessage('assistant', result.aiMessage.content);
+    scrollToBottom(miniChatMessages);
+  } catch (err) {
+    removeMiniTyping();
+    isMiniTyping = false;
+    appendMiniMessage('assistant', 'Sorry, something went wrong. Please try again.');
+    scrollToBottom(miniChatMessages);
+  }
+}
+
+miniMessageInput.addEventListener('input', () => {
+  autoResizeTextarea(miniMessageInput);
+  updateMiniSendBtnState();
+});
+
+miniMessageInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMiniMessage();
+  }
+});
+
+miniSendBtn.addEventListener('click', sendMiniMessage);
+
+function updateMiniSendBtnState() {
+  miniSendBtn.disabled = !miniMessageInput.value.trim();
+}
+
+// ===== Settings Modal =====
+settingsBtn.addEventListener('click', () => {
+  settingsModal.classList.add('open');
+});
+
+settingsClose.addEventListener('click', () => {
+  settingsModal.classList.remove('open');
+});
+
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) {
+    settingsModal.classList.remove('open');
+  }
+});
+
+// Clear all chats
+clearAllChatsBtn.addEventListener('click', () => {
+  settingsModal.classList.remove('open');
+  showConfirm('Are you sure you want to delete ALL chats? This action cannot be undone.', async () => {
+    try {
+      await API.clearAllChats();
+      chats = [];
+      currentChatId = null;
+      searchInput.value = '';
+      renderChatList();
+      showWelcome();
+      if (miniChat.classList.contains('open')) {
+        miniChatMessages.innerHTML = `<div class="mini-welcome"><p>Ask any doubt about the conversation. I'll help you understand!</p></div>`;
+      }
+    } catch(err) {
+      showToast('Failed to clear chats. Try again.');
+    }
+  });
+});
+
+// ===== Model Selector =====
+modelSelectorBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  modelDropdown.classList.toggle('open');
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.model-selector')) {
+    modelDropdown.classList.remove('open');
+  }
+});
+
+document.querySelectorAll('.model-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.model-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    const model = opt.dataset.model;
+    settings.currentModel = model;
+    // Get only the main text, not the badge text
+    const nameEl = opt.querySelector('.model-option-name');
+    const nameText = nameEl.childNodes[0].textContent.trim();
+    modelName.textContent = nameText;
+    modelDropdown.classList.remove('open');
+    saveSettings();
+    showToast('Model changed to ' + nameText);
+  });
+});
+
+// ===== Font Size =====
+fontSizeSelect.addEventListener('change', () => {
+  settings.fontSize = fontSizeSelect.value;
+  applyFontSize();
+  saveSettings();
+});
+
+function applyFontSize() {
+  document.body.classList.remove('font-small', 'font-large');
+  if (settings.fontSize === 'small') document.body.classList.add('font-small');
+  else if (settings.fontSize === 'large') document.body.classList.add('font-large');
+}
+
+// ===== Enter to Send Toggle =====
+enterToSendToggle.addEventListener('change', () => {
+  settings.enterToSend = enterToSendToggle.checked;
+  saveSettings();
+});
+
+// ===== Unrestricted Mode Toggle =====
+unrestrictedModeToggle.addEventListener('change', () => {
+  settings.unrestrictedMode = unrestrictedModeToggle.checked;
+  saveSettings();
+});
+
+// ===== Custom Instructions =====
+customInstructionsInput.addEventListener('change', () => {
+  settings.customInstructions = customInstructionsInput.value;
+  saveSettings();
+});
+
+// ===== Language Select (UI only — more languages coming soon) =====
+const langSelectEl = document.getElementById('langSelect');
+if (langSelectEl) {
+  langSelectEl.addEventListener('change', () => {
+    langSelectEl.value = 'en'; // reset — only English supported now
+    showToast('More languages coming soon!');
+  });
+}
+
+// ===== Export Data =====
+exportDataBtn.addEventListener('click', async () => {
+  try {
+    const allChats = await API.getChats();
+    const exportData = { chats: [], exported_at: new Date().toISOString() };
+
+    for (const chat of allChats) {
+      const messages = await API.getMessages(chat.id);
+      const miniMessages = await API.getMiniMessages(chat.id);
+      exportData.chats.push({
+        ...chat,
+        messages,
+        mini_messages: miniMessages,
+      });
+    }
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `smartai-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Data exported successfully');
+  } catch (err) {
+    showToast('Export failed');
+  }
+});
+
+// ===== Save/Load Settings =====
+function saveSettings() {
+  localStorage.setItem('smartai_settings', JSON.stringify(settings));
+}
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem('smartai_settings');
+    if (saved) {
+      Object.assign(settings, JSON.parse(saved));
+    }
+    // Apply settings to UI
+    themeSelect.value = settings.theme || 'dark';
+    applyTheme();
+    fontSizeSelect.value = settings.fontSize;
+    applyFontSize();
+    enterToSendToggle.checked = settings.enterToSend;
+    unrestrictedModeToggle.checked = settings.unrestrictedMode;
+    customInstructionsInput.value = settings.customInstructions;
+    // Model
+    const modelDisplayNames = {
+      'smart-ai-1': 'Samba AI 1.0',
+      'smart-ai-2': 'Samba AI 2.0 Pro',
+      'nvidia-nemotron': 'Samba AI Ultra'
+    };
+    modelName.textContent = modelDisplayNames[settings.currentModel] || 'Samba AI 1.0';
+    document.querySelectorAll('.model-option').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.model === settings.currentModel);
+    });
+  } catch (e) {
+    // ignore
+  }
+}
+
+themeSelect.addEventListener('change', () => {
+  settings.theme = themeSelect.value;
+  saveSettings();
+  applyTheme();
+});
+
+function applyTheme() {
+  if (settings.theme === 'light') {
+    document.body.classList.add('light-theme');
+  } else {
+    document.body.classList.remove('light-theme');
+  }
+}
+
+// ===== Login Modal =====
+userProfile.addEventListener('click', () => {
+  if (currentUser) {
+    showConfirm('Do you want to sign out?', async () => {
+      try { await API.logout(); } catch (e) { /* ignore */ }
+      currentUser = null;
+      localStorage.removeItem('smartai_user');
+      updateUserUI();
+      showToast('Signed out');
+    }, 'Sign Out'); // pass label — no more manual mutation
+  } else {
+    loginModal.classList.add('open');
+  }
+});
+
+loginClose.addEventListener('click', () => {
+  loginModal.classList.remove('open');
+});
+
+loginModal.addEventListener('click', (e) => {
+  if (e.target === loginModal) {
+    loginModal.classList.remove('open');
+  }
+});
+
+// Auth Mode Toggle
+let isSignUpMode = false;
+const toggleAuthMode = document.getElementById('toggleAuthMode');
+const nameGroup = document.getElementById('nameGroup');
+const loginModalSubtitle = document.getElementById('loginModalSubtitle');
+const registerBtn = document.getElementById('registerBtn');
+
+toggleAuthMode.addEventListener('click', (e) => {
+  e.preventDefault();
+  isSignUpMode = !isSignUpMode;
+  if (isSignUpMode) {
+    nameGroup.style.display = 'block';
+    loginSubmit.style.display = 'none';
+    registerBtn.style.display = 'block';
+    loginModalSubtitle.textContent = 'Create a new account';
+    toggleAuthMode.textContent = 'Already have an account? Sign in';
+    document.querySelector('#loginModal h2').textContent = 'Sign Up';
+  } else {
+    nameGroup.style.display = 'none';
+    loginSubmit.style.display = 'block';
+    registerBtn.style.display = 'none';
+    loginModalSubtitle.textContent = 'Sign in to your account';
+    toggleAuthMode.textContent = 'Need an account? Sign up';
+    document.querySelector('#loginModal h2').textContent = 'Sign In';
+  }
+});
+
+loginSubmit.addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email) {
+    document.getElementById('loginEmail').focus();
+    return;
+  }
+  if (!password) {
+    document.getElementById('loginPassword').focus();
+    return;
+  }
+  try {
+    const result = await API.login(email, password);
+    if (result.error) {
+      showToast(result.error);
+      return;
+    }
+    currentUser = result.user;
+    localStorage.setItem('smartai_user', JSON.stringify(currentUser));
+    localStorage.removeItem('smartai_guest_count'); // reset guest message limit
+    updateUserUI();
+    loginModal.classList.remove('open');
+    showToast('Signed in successfully');
+  } catch (err) {
+    showToast('Login failed. Check your connection.');
+  }
+});
+
+// ===== Google Sign-In Handler =====
+async function handleGoogleCredentialResponse(response) {
+  try {
+    const result = await API.loginWithGoogle(response.credential);
+    if (result.error) {
+      showToast(result.error);
+      return;
+    }
+    currentUser = result.user;
+    localStorage.setItem('smartai_user', JSON.stringify(currentUser));
+    localStorage.removeItem('smartai_guest_count'); // reset guest message limit
+    updateUserUI();
+    loginModal.classList.remove('open');
+    showToast('Signed in with Google successfully');
+  } catch (err) {
+    showToast('Google login failed. Check your connection.');
+  }
+}
+
+// Initialize Google Auth when script loads
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    if (window.google) {
+      google.accounts.id.initialize({
+        client_id: "934282490318-runko93pndtjqs6aas9jqbb53ti6pv6a.apps.googleusercontent.com",
+        callback: handleGoogleCredentialResponse
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("googleSignInDiv"),
+        { theme: "outline", size: "large", type: "standard", width: 280 }
+      );
+    }
+  }, 1000); // Small delay to ensure Google SDK is fully loaded
+});
+
+// Register button
+if (registerBtn) {
+  registerBtn.addEventListener('click', async () => {
+    const name = document.getElementById('loginName').value.trim();
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!name) { document.getElementById('loginName').focus(); return; }
+    if (!email) { document.getElementById('loginEmail').focus(); return; }
+    if (!password || password.length < 6) {
+      showToast('Password must be at least 6 characters');
+      return;
+    }
+    try {
+      const result = await API.register(name, email, password);
+      if (result.error) {
+        showToast(result.error);
+        return;
+      }
+      currentUser = result.user;
+      localStorage.setItem('smartai_user', JSON.stringify(currentUser));
+      updateUserUI();
+      loginModal.classList.remove('open');
+      showToast('Account created successfully');
+    } catch (err) {
+      showToast('Registration failed. Check your connection.');
+    }
+  });
+}
+
+
+
+loginGuest.addEventListener('click', () => {
+  loginModal.classList.remove('open');
+});
+
+function updateUserUI() {
+  if (currentUser) {
+    userName.textContent = currentUser.name;
+    userEmail.textContent = currentUser.email || 'Signed in';
+    userAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+    
+    // Unrestricted mode logic
+    if (currentUser.email === 'prudhvisiva03@gmail.com') {
+      securityModeContainer.style.display = 'flex';
+    } else {
+      securityModeContainer.style.display = 'none';
+      settings.unrestrictedMode = false; // Force disabled
+      unrestrictedModeToggle.checked = false;
+      saveSettings();
+    }
+  } else {
+    userName.textContent = 'Guest';
+    userEmail.textContent = 'Click to sign in';
+    userAvatar.textContent = 'G';
+    securityModeContainer.style.display = 'none';
+    settings.unrestrictedMode = false;
+    unrestrictedModeToggle.checked = false;
+  }
+
+  // Reload chats for this account (critical for user-scoped history)
+  currentChatId = null;
+  showWelcome();
+  API.getChats().then(freshChats => {
+    chats = freshChats;
+    renderChatList();
+  }).catch(() => {});
+}
+
+// Load user from localStorage
+function loadUser() {
+  try {
+    const saved = localStorage.getItem('smartai_user');
+    if (saved) {
+      currentUser = JSON.parse(saved);
+      updateUserUI();
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+// ===== Keyboard Shortcuts =====
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'h') {
+    e.preventDefault();
+    if (miniChat.classList.contains('open')) {
+      miniChatClose.click();
+    } else {
+      miniChatToggle.click();
+    }
+  }
+  // Escape closes any open modal
+  if (e.key === 'Escape') {
+    if (settingsModal.classList.contains('open')) settingsModal.classList.remove('open');
+    if (loginModal.classList.contains('open')) loginModal.classList.remove('open');
+    if (confirmOverlay.classList.contains('open')) {
+      confirmOverlay.classList.remove('open');
+      confirmCallback = null;
+    }
+  }
+});
+
+// ===== Utility Functions =====
+function autoResizeTextarea(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, parseInt(getComputedStyle(document.documentElement).getPropertyValue('--input-max-height')) || 200) + 'px';
+}
+
+function scrollToBottom(element) {
+  requestAnimationFrame(() => {
+    element.scrollTop = element.scrollHeight;
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Ensure images don't break scroll position when they load
+document.addEventListener('load', function(e) {
+  if (e.target.tagName.toLowerCase() === 'img' && chatArea.contains(e.target)) {
+    scrollToBottom(chatArea);
+  }
+}, true); // use capture phase to catch load events on images
+
+// Configure marked.js with highlight.js
+if (typeof marked !== 'undefined') {
+  marked.setOptions({
+    breaks: true,
+    highlight: function(code, lang) {
+      if (typeof hljs !== 'undefined') {
+        if (lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(code, { language: lang }).value;
+          } catch (e) {}
+        }
+        return hljs.highlightAuto(code).value;
+      }
+      return code;
+    }
+  });
+}
+
+function formatContent(text) {
+  if (typeof marked !== 'undefined') {
+    try {
+      const parsedHTML = marked.parse(text);
+      if (typeof DOMPurify !== 'undefined') {
+        return DOMPurify.sanitize(parsedHTML);
+      }
+      return parsedHTML;
+    } catch (error) {
+      console.error('Markdown parse error:', error);
+    }
+  }
+  
+  // Fallback if marked is not loaded
+  let html = escapeHtml(text);
+  html = html.replace(/\n/g, '<br>');
+  return html;
+}
+
+// ===== Initialize =====
+async function init() {
+  try {
+    loadSettings();
+    // Show loading indicator while fetching
+    chatList.innerHTML = '<div style="padding: 16px 12px; color: var(--text-muted); font-size: 13px; text-align: center;">⏳ Loading...</div>';
+    // Try to restore session from server first, fallback to localStorage
+    try {
+      const session = await API.getMe();
+      if (session.user) {
+        currentUser = session.user;
+        localStorage.setItem('smartai_user', JSON.stringify(currentUser));
+        updateUserUI();
+      } else {
+        loadUser();
+      }
+    } catch (e) {
+      loadUser();
+    }
+    chats = await API.getChats();
+    renderChatList();
+    showWelcome();
+  } catch (err) {
+    console.error('Failed to initialize:', err);
+    chatList.innerHTML = '<div style="padding: 16px 12px; color: #e88; font-size: 13px; text-align: center;">⚠️ Failed to load. Refresh the page.</div>';
+  }
+}
+
+init();
+
+// ===== Auto-Hint via Text Selection =====
+const selectionBtn = document.createElement('button');
+selectionBtn.className = 'selection-hint-btn';
+selectionBtn.innerHTML = `💡 Explain this`;
+document.body.appendChild(selectionBtn);
+
+let currentSelectedText = '';
+
+document.addEventListener('selectionchange', () => {
+  const selection = window.getSelection();
+  const text = selection.toString().trim();
+  
+  if (text.length > 0 && text.length < 150) {
+    // Ensure the selection is within a message content
+    let node = selection.anchorNode;
+    let isInsideMessage = false;
+    while (node && node !== document.body) {
+      if (node.classList && node.classList.contains('message-content')) {
+        isInsideMessage = true;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    if (isInsideMessage) {
+      currentSelectedText = text;
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      
+      // Position the button centered above the selection
+      selectionBtn.style.left = `${rect.left + (rect.width / 2)}px`;
+      selectionBtn.style.top = `${rect.top - 44}px`;
+      selectionBtn.classList.add('visible');
+      return;
+    }
+  }
+  
+  selectionBtn.classList.remove('visible');
+  currentSelectedText = '';
+});
+
+// Hide on mousedown anywhere else
+document.addEventListener('mousedown', (e) => {
+  if (e.target !== selectionBtn) {
+    selectionBtn.classList.remove('visible');
+  }
+});
+
+// Click the hint button
+selectionBtn.addEventListener('mousedown', (e) => {
+  e.preventDefault(); // maintain selection context momentarily
+  e.stopPropagation();
+  
+  if (!currentSelectedText) return;
+  
+  // Open mini chat if closed
+  if (!miniChat.classList.contains('open')) {
+    miniChatToggle.click();
+  }
+  
+  // Pre-fill input and trigger auto-send
+  miniMessageInput.value = `What does "${currentSelectedText}" mean?`;
+  sendMiniMessage(); // Assume sendMiniMessage reads from miniMessageInput
+  
+  // Cleanup
+  selectionBtn.classList.remove('visible');
+  window.getSelection().removeAllRanges();
+});
+
+// ===== Premium / Upgrade System =====
+const premiumModal = document.getElementById('premiumModal');
+const premiumClose = document.getElementById('premiumClose');
+const premiumPayBtn = document.getElementById('premiumPayBtn');
+const premiumStatusText = document.getElementById('premiumStatusText');
+const upgradeBtn = document.getElementById('upgradeBtn');
+const upgradeBtnText = document.getElementById('upgradeBtnText');
+
+function updateUpgradeBtnState(isPremium, expiry) {
+  if (isPremium && expiry) {
+    const expiryDate = new Date(expiry);
+    const formatted = expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    upgradeBtnText.textContent = `Pro Active · Expires ${formatted}`;
+    upgradeBtn.classList.add('pro-active');
+  } else {
+    upgradeBtnText.textContent = 'Upgrade to Pro';
+    upgradeBtn.classList.remove('pro-active');
+  }
+}
+
+async function checkPremiumStatus() {
+  try {
+    const res = await fetch('/api/payment/status');
+    const data = await res.json();
+    updateUpgradeBtnState(data.isPremium, data.premiumExpiry);
+    if (data.isPremium) {
+      settings.unrestrictedMode = true;
+      const toggle = document.getElementById('unrestrictedMode');
+      if (toggle) toggle.checked = true;
+    }
+  } catch (_) {}
+}
+
+upgradeBtn.addEventListener('click', async () => {
+  // If not logged in, prompt login first
+  if (!currentUser) {
+    showToast('Please sign in to upgrade to Pro');
+    loginModal.classList.add('open');
+    return;
+  }
+  premiumStatusText.textContent = '';
+  premiumModal.classList.add('active');
+  // Check current status to update modal text
+  try {
+    const res = await fetch('/api/payment/status');
+    const data = await res.json();
+    if (data.isPremium && data.premiumExpiry) {
+      const exp = new Date(data.premiumExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      premiumStatusText.textContent = `✅ Your Pro plan is active until ${exp}`;
+      premiumPayBtn.textContent = 'Extend by 1 Week';
+    }
+  } catch (_) {}
+});
+
+premiumClose.addEventListener('click', () => {
+  premiumModal.classList.remove('active');
+});
+
+premiumModal.addEventListener('click', (e) => {
+  if (e.target === premiumModal) premiumModal.classList.remove('active');
+});
+
+premiumPayBtn.addEventListener('click', async () => {
+  if (!currentUser) {
+    showToast('Please sign in to upgrade');
+    return;
+  }
+
+  premiumPayBtn.disabled = true;
+  premiumPayBtn.textContent = 'Creating order...';
+
+  try {
+    // 1. Create Razorpay order
+    const orderRes = await fetch('/api/payment/create-order', { method: 'POST' });
+    const orderData = await orderRes.json();
+
+    if (orderData.error) {
+      premiumStatusText.textContent = '❌ ' + orderData.error;
+      premiumPayBtn.disabled = false;
+      premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
+      return;
+    }
+
+    // DEV MOCK MODE: Bypass actual Razorpay window if using dummy keys
+    if (orderData.mockMode) {
+      premiumStatusText.textContent = 'Verifying mock payment...';
+      const verifyRes = await fetch('/api/payment/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isMock: true })
+      });
+      const verifyData = await verifyRes.json();
+      if (verifyData.success) {
+        premiumStatusText.textContent = '🎉 Pro activated! You now have Unrestricted Mode.';
+        updateUpgradeBtnState(true, verifyData.premiumExpiry);
+        settings.unrestrictedMode = true;
+        const toggle = document.getElementById('unrestrictedMode');
+        if (toggle) toggle.checked = true;
+        showToast('⚡ Pro Plan activated successfully!');
+        setTimeout(() => premiumModal.classList.remove('active'), 2000);
+      }
+      return;
+    }
+
+    // 2. Open Razorpay checkout
+    const options = {
+      key: orderData.keyId,
+      amount: orderData.amount,
+      currency: orderData.currency,
+      name: 'Samba AI',
+      description: 'Pro Plan — 1 Week',
+      order_id: orderData.orderId,
+      handler: async function(response) {
+        // 3. Verify payment on backend
+        premiumStatusText.textContent = 'Verifying payment...';
+        try {
+          const verifyRes = await fetch('/api/payment/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyData.success) {
+            premiumStatusText.textContent = '🎉 Pro activated! You now have Unrestricted Mode.';
+            updateUpgradeBtnState(true, verifyData.premiumExpiry);
+            settings.unrestrictedMode = true;
+            const toggle = document.getElementById('unrestrictedMode');
+            if (toggle) toggle.checked = true;
+            showToast('⚡ Pro Plan activated successfully!');
+            setTimeout(() => premiumModal.classList.remove('active'), 2000);
+          } else {
+            premiumStatusText.textContent = '❌ Verification failed: ' + (verifyData.error || 'Unknown error');
+          }
+        } catch(e) {
+          premiumStatusText.textContent = '❌ Network error during verification.';
+        }
+      },
+      prefill: {
+        name: currentUser?.name || '',
+        email: currentUser?.email || ''
+      },
+      theme: { color: '#7c3aed' },
+      modal: {
+        ondismiss: function() {
+          premiumPayBtn.disabled = false;
+          premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
+          premiumStatusText.textContent = 'Payment cancelled.';
+        }
+      }
+    };
+
+    const rzp = new Razorpay(options);
+    rzp.open();
+    premiumPayBtn.disabled = false;
+    premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
+
+  } catch(err) {
+    premiumStatusText.textContent = '❌ Failed to connect to payment gateway.';
+    premiumPayBtn.disabled = false;
+    premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
+  }
+});
+
+// Check premium status on load (after user session loads)
+setTimeout(checkPremiumStatus, 1000);

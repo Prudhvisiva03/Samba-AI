@@ -1,0 +1,22 @@
+# Dependencies — never commit these
+node_modules/
+
+# Environment variables — NEVER commit, contains API keys
+.env
+.env.local
+.env.production
+
+# Database — contains user data & session data
+data/chat.json
+data/uploads/
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/backups/
+
+# Temp files from atomic DB writes
+*.tmp
+
+# OS clutter
+.DS_Store
+Thumbs.db
