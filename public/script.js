@@ -152,7 +152,10 @@ function toggleSidebar() {
   sidebarOpenBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
 }
 
-// Set initial state
+// Set initial state based on screen size
+if (window.innerWidth <= 768) {
+  sidebar.classList.add('hidden');
+}
 sidebarOpenBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
 
 sidebarToggle.addEventListener('click', toggleSidebar);
