@@ -9,7 +9,7 @@ let settings = {
   fontSize: 'medium',
   customInstructions: '',
   currentModel: 'smart-ai-1',
-  theme: 'dark',
+  theme: 'light',
   unrestrictedMode: false
 };
 
@@ -1169,7 +1169,7 @@ function loadSettings() {
       Object.assign(settings, JSON.parse(saved));
     }
     // Apply settings to UI
-    themeSelect.value = settings.theme || 'dark';
+    themeSelect.value = settings.theme || 'light';
     applyTheme();
     fontSizeSelect.value = settings.fontSize;
     applyFontSize();
