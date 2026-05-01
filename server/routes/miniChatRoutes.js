@@ -8,6 +8,9 @@ function getUserId(req) {
   if (req.session && req.session.userId) {
     return req.session.userId;
   }
+  if (req.session) {
+    req.session.isGuest = true;
+  }
   return req.sessionID || 'guest_unknown';
 }
 

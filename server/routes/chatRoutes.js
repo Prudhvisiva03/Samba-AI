@@ -8,6 +8,10 @@ function getUserId(req) {
   if (req.session && req.session.userId) {
     return req.session.userId;
   }
+  // Force session save so the guest ID cookie is sent to the browser
+  if (req.session) {
+    req.session.isGuest = true;
+  }
   return req.sessionID || 'guest_unknown';
 }
 
