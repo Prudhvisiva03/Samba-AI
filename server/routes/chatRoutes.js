@@ -3,15 +3,15 @@ const router = express.Router();
 const db = require('../database');
 const { generateMainResponse, generateChatTitle } = require('../services/aiService');
 
-// Helper — get userId from session (guest uses session ID)
+const { getUserIdFromReq } = require('./authRoutes');
+
+// Helper — get userId from JWT cookie or session
 function getUserId(req) {
-  if (req.session && req.session.userId) {
-    return req.session.userId;
-  }
-  // Force session save so the guest ID cookie is sent to the browser
-  if (req.session) {
-    req.session.isGuest = true;
-  }
+  // Try JWT first (persistent across server restarts)
+  const userId = getUserIdFromReq(req);
+  if (userId) return userId;
+  // Guest: use session ID (scoped to browser tab)
+  if (req.session) req.session.isGuest = true;
   return req.sessionID || 'guest_unknown';
 }
 

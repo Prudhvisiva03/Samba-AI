@@ -3,14 +3,13 @@ const router = express.Router();
 const db = require('../database');
 const { generateHelpResponse } = require('../services/aiService');
 
-// Helper — get userId from session
+const { getUserIdFromReq } = require('./authRoutes');
+
+// Helper — get userId from JWT cookie or session
 function getUserId(req) {
-  if (req.session && req.session.userId) {
-    return req.session.userId;
-  }
-  if (req.session) {
-    req.session.isGuest = true;
-  }
+  const userId = getUserIdFromReq(req);
+  if (userId) return userId;
+  if (req.session) req.session.isGuest = true;
   return req.sessionID || 'guest_unknown';
 }
 

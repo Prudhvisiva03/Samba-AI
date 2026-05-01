@@ -11,6 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const SQLiteStore = require('./sessionStore');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,6 +59,9 @@ app.use(cors({
 
 // Body parsing with size limit
 app.use(express.json({ limit: '5mb' }));
+
+// Cookie parser — needed for JWT token reading
+app.use(cookieParser());
 
 // Session management — persisted in SQLite so users stay logged in across restarts
 app.use(session({
