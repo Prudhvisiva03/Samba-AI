@@ -2132,13 +2132,12 @@ body.font-large .mini-message-content {
     height: 100%;
     z-index: 500;
     box-shadow: 4px 0 16px var(--shadow);
-    transform: translateX(0);
+    transform: translateX(-100%);
     transition: transform var(--transition-speed) ease;
   }
 
-  .sidebar.hidden {
-    margin-left: 0;
-    transform: translateX(-100%);
+  .sidebar.open {
+    transform: translateX(0);
   }
 
   .topbar {
@@ -2154,10 +2153,14 @@ body.font-large .mini-message-content {
   }
 
   .mini-chat {
-    width: calc(100vw - 20px);
-    height: 60vh;
-    right: 10px;
-    bottom: 10px;
+    width: 100vw;
+    height: 80vh;
+    right: 0;
+    bottom: 0;
+    border-radius: 24px 24px 0 0;
+    border-bottom: none;
+    border-left: none;
+    border-right: none;
   }
   
   .input-container {

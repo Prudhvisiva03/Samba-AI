@@ -148,15 +148,24 @@ const API = {
 
 // ===== Sidebar =====
 function toggleSidebar() {
-  sidebar.classList.toggle('hidden');
-  sidebarOpenBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
+  if (window.innerWidth <= 768) {
+    sidebar.classList.toggle('open');
+  } else {
+    sidebar.classList.toggle('hidden');
+  }
+  updateSidebarBtnState();
 }
 
-// Set initial state based on screen size
-if (window.innerWidth <= 768) {
-  sidebar.classList.add('hidden');
+function updateSidebarBtnState() {
+  if (window.innerWidth <= 768) {
+    sidebarOpenBtn.style.display = sidebar.classList.contains('open') ? 'none' : 'block';
+  } else {
+    sidebarOpenBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
+  }
 }
-sidebarOpenBtn.style.display = sidebar.classList.contains('hidden') ? 'block' : 'none';
+
+// Set initial state
+updateSidebarBtnState();
 
 sidebarToggle.addEventListener('click', toggleSidebar);
 sidebarOpenBtn.addEventListener('click', toggleSidebar);
