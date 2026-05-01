@@ -1513,27 +1513,34 @@ function formatContent(text) {
 async function init() {
   try {
     loadSettings();
-    // Show loading indicator while fetching
-    chatList.innerHTML = '<div style="padding: 16px 12px; color: var(--text-muted); font-size: 13px; text-align: center;">⏳ Loading...</div>';
-    // Try to restore session from server first, fallback to localStorage
+    chatList.innerHTML = '<div style="padding: 16px 12px; color: var(--text-muted); font-size: 13px; text-align: center;">\u23f3 Loading...</div>';
+    // ALWAYS verify session with server — never trust localStorage alone
     try {
       const session = await API.getMe();
       if (session.user) {
+        // Server confirmed session valid ✅
         currentUser = session.user;
         localStorage.setItem('smartai_user', JSON.stringify(currentUser));
         updateUserUI();
       } else {
-        loadUser();
+        // Session expired (server restart etc.) — clear stale localStorage
+        const hadUser = localStorage.getItem('smartai_user');
+        localStorage.removeItem('smartai_user');
+        currentUser = null;
+        updateUserUI();
+        if (hadUser) {
+          setTimeout(() => showToast('Session expired. Please sign in again.'), 500);
+        }
       }
     } catch (e) {
-      loadUser();
+      loadUser(); // Network error only — try localStorage
     }
     chats = await API.getChats();
     renderChatList();
     showWelcome();
   } catch (err) {
     console.error('Failed to initialize:', err);
-    chatList.innerHTML = '<div style="padding: 16px 12px; color: #e88; font-size: 13px; text-align: center;">⚠️ Failed to load. Refresh the page.</div>';
+    chatList.innerHTML = '<div style="padding: 16px 12px; color: #e88; font-size: 13px; text-align: center;">\u26a0\ufe0f Failed to load. Refresh the page.</div>';
   }
 }
 
