@@ -248,6 +248,11 @@ function clearAllChats(userId = null) {
   return ids.length;
 }
 
+function migrateGuestChats(sessionId, newUserId) {
+  if (!sessionId || !newUserId) return;
+  db.prepare('UPDATE chats SET user_id = ? WHERE user_id = ?').run(newUserId, sessionId);
+}
+
 // ===== Message Operations =====
 
 function getMessages(chatId) {
@@ -294,5 +299,6 @@ module.exports = {
   getMessages,
   addMessage,
   getMiniMessages,
-  addMiniMessage
+  addMiniMessage,
+  migrateGuestChats
 };

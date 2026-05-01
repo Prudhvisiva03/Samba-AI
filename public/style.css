@@ -1564,18 +1564,18 @@ textarea {
   line-height: 1.5;
   color: var(--text-primary);
   padding: 8px 12px;
-  background: #1C1C1C;
+  background: var(--bg-user-bubble);
   border-radius: 12px 12px 2px 12px;
   min-width: 0;
   box-shadow: var(--shadow-sm);
 }
 
 .mini-message.assistant .mini-message-content {
-  background: transparent;
+  background: var(--bg-ai-bubble);
   border-radius: 12px;
   box-shadow: none;
   padding: 8px 4px;
-  color: #EDEDED;
+  color: var(--text-primary);
 }
 
 /* Mini Typing */

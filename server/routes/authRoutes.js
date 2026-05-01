@@ -52,6 +52,9 @@ router.post('/register', async (req, res) => {
     const user = db.createUser(cleanName, cleanEmail, hash);
 
     req.session.userId = user.id;
+    if (req.sessionID) {
+      db.migrateGuestChats(req.sessionID, user.id);
+    }
     res.status(201).json({
       user: { id: user.id, name: user.name, email: user.email }
     });
@@ -83,6 +86,9 @@ router.post('/login', async (req, res) => {
     }
 
     req.session.userId = user.id;
+    if (req.sessionID) {
+      db.migrateGuestChats(req.sessionID, user.id);
+    }
     res.json({
       user: { id: user.id, name: user.name, email: user.email }
     });
@@ -145,6 +151,9 @@ router.post('/google', async (req, res) => {
     }
 
     req.session.userId = user.id;
+    if (req.sessionID) {
+      db.migrateGuestChats(req.sessionID, user.id);
+    }
     res.json({
       user: { id: user.id, name: user.name, email: user.email }
     });

@@ -1225,8 +1225,18 @@ userProfile.addEventListener('click', () => {
       currentUser = null;
       localStorage.removeItem('smartai_user');
       updateUserUI();
+      currentChatId = null;
+      chatTitleEl.textContent = 'Samba AI 1.0';
+      messagesEl.innerHTML = `
+        <div class="welcome-screen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+          <h1>How can I help you today?</h1>
+        </div>`;
+      loadChats();
       showToast('Signed out');
-    }, 'Sign Out'); // pass label — no more manual mutation
+    }, 'Sign Out');
   } else {
     loginModal.classList.add('open');
   }
@@ -1290,6 +1300,7 @@ loginSubmit.addEventListener('click', async () => {
     localStorage.setItem('smartai_user', JSON.stringify(currentUser));
     localStorage.removeItem('smartai_guest_count'); // reset guest message limit
     updateUserUI();
+    loadChats();
     loginModal.classList.remove('open');
     showToast('Signed in successfully');
   } catch (err) {
@@ -1309,6 +1320,7 @@ async function handleGoogleCredentialResponse(response) {
     localStorage.setItem('smartai_user', JSON.stringify(currentUser));
     localStorage.removeItem('smartai_guest_count'); // reset guest message limit
     updateUserUI();
+    loadChats();
     loginModal.classList.remove('open');
     showToast('Signed in with Google successfully');
   } catch (err) {
@@ -1353,6 +1365,7 @@ if (registerBtn) {
       currentUser = result.user;
       localStorage.setItem('smartai_user', JSON.stringify(currentUser));
       updateUserUI();
+      loadChats();
       loginModal.classList.remove('open');
       showToast('Account created successfully');
     } catch (err) {
