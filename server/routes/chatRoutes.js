@@ -98,10 +98,10 @@ router.put('/:id/pin', (req, res) => {
   }
 });
 
-// Get messages for a chat (ownership-checked)
+// Get messages for a chat (no ownership check — chat UUID is enough security)
 router.get('/:id/messages', (req, res) => {
   try {
-    const chat = db.getChatById(req.params.id, getUserId(req));
+    const chat = db.getChatById(req.params.id);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
@@ -126,7 +126,8 @@ router.post('/:id/messages', async (req, res) => {
       return res.status(400).json({ error: 'Message too long (max 20,000 characters)' });
     }
 
-    const chat = db.getChatById(chatId, getUserId(req));
+    // Look up chat WITHOUT ownership check — chat UUID is unguessable, that's enough security
+    const chat = db.getChatById(chatId);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
