@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 const { generateHelpResponse } = require('../services/aiService');
-
 const { getUserIdFromReq } = require('./authRoutes');
 
 // Helper — get userId from JWT cookie or session
@@ -14,9 +13,9 @@ function getUserId(req) {
 }
 
 // Get mini messages for a chat
-router.get('/:id/mini-messages', (req, res) => {
+router.get('/:id/mini-messages', async (req, res) => {
   try {
-    const messages = db.getMiniMessages(req.params.id);
+    const messages = await db.getMiniMessages(req.params.id);
     res.json(messages);
   } catch (err) {
     console.error('[miniChat] GET error:', err.message);
@@ -35,28 +34,19 @@ router.post('/:id/mini-messages', async (req, res) => {
     }
 
     const cleanContent = content.trim();
-
-    const userMsg = db.addMiniMessage(chatId, 'user', cleanContent);
+    const userMsg = await db.addMiniMessage(chatId, 'user', cleanContent);
 
     // Get BOTH main chat context AND mini chat history
-    const mainMessages = db.getMessages(chatId);       // Main conversation context
-    const miniHistory = db.getMiniMessages(chatId);     // Mini chat's own history
+    const [mainMessages, miniHistory] = await Promise.all([
+      db.getMessages(chatId),
+      db.getMiniMessages(chatId)
+    ]);
 
-    // Security check for Unrestricted Mode — allow premium users OR dev account
-    let isUnrestricted = false;
-    if (unrestrictedMode) {
-      const userId = getUserId(req);
-      if (userId) {
-        const isPremium = db.isPremiumActive(userId);
-        const user = db.getUserById(userId);
-        if (isPremium || (user && user.email === 'prudhvisiva03@gmail.com')) {
-          isUnrestricted = true;
-        }
-      }
-    }
+    // Unrestricted Mode — only for logged-in users
+    const isUnrestricted = !!(unrestrictedMode && getUserIdFromReq(req));
 
     const aiText = await generateHelpResponse(cleanContent, miniHistory, mainMessages, isUnrestricted);
-    const aiMsg = db.addMiniMessage(chatId, 'assistant', aiText);
+    const aiMsg = await db.addMiniMessage(chatId, 'assistant', aiText);
 
     res.json({
       userMessage: userMsg,

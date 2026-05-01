@@ -1,132 +1,32 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const { Pool } = require('pg');
 const { v4: uuidv4 } = require('uuid');
 
-const dataDir = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+// ===== PostgreSQL Connection =====
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000
+});
 
-const dbPath = path.join(dataDir, 'samba.db');
-const db = new Database(dbPath);
-
-// WAL mode — dramatically better concurrent performance
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
-
-// ===== Schema =====
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL,
-    is_premium INTEGER DEFAULT 0,
-    premium_expiry TEXT,
-    premium_activated_at TEXT,
-    created_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS chats (
-    id TEXT PRIMARY KEY,
-    user_id TEXT,
-    title TEXT NOT NULL DEFAULT 'New Chat',
-    pinned INTEGER DEFAULT 0,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS messages (
-    id TEXT PRIMARY KEY,
-    chat_id TEXT NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
-  );
-
-  CREATE TABLE IF NOT EXISTS mini_messages (
-    id TEXT PRIMARY KEY,
-    chat_id TEXT NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
-  );
-
-  CREATE INDEX IF NOT EXISTS idx_chats_user ON chats(user_id);
-  CREATE INDEX IF NOT EXISTS idx_messages_chat ON messages(chat_id, created_at);
-  CREATE INDEX IF NOT EXISTS idx_mini_messages_chat ON mini_messages(chat_id, created_at);
-`);
-
-// ===== One-time Migration from chat.json =====
-const jsonPath = path.join(dataDir, 'chat.json');
-if (fs.existsSync(jsonPath)) {
-  try {
-    const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-    const migrate = db.transaction(() => {
-      for (const u of (raw.users || [])) {
-        const exists = db.prepare('SELECT id FROM users WHERE id = ?').get(u.id);
-        if (!exists) {
-          db.prepare(`INSERT INTO users (id, name, email, password, is_premium, premium_expiry, premium_activated_at, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
-            u.id, u.name, u.email, u.password,
-            u.isPremium ? 1 : 0,
-            u.premiumExpiry || null,
-            u.premiumActivatedAt || null,
-            u.created_at || new Date().toISOString()
-          );
-        }
-      }
-      for (const c of (raw.chats || [])) {
-        const exists = db.prepare('SELECT id FROM chats WHERE id = ?').get(c.id);
-        if (!exists) {
-          db.prepare(`INSERT INTO chats (id, user_id, title, pinned, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)`).run(
-            c.id, c.user_id || null, c.title || 'New Chat',
-            c.pinned ? 1 : 0,
-            c.created_at || new Date().toISOString(),
-            c.updated_at || new Date().toISOString()
-          );
-        }
-      }
-      for (const m of (raw.messages || [])) {
-        const exists = db.prepare('SELECT id FROM messages WHERE id = ?').get(m.id);
-        if (!exists) {
-          db.prepare(`INSERT INTO messages (id, chat_id, role, content, created_at)
-            VALUES (?, ?, ?, ?, ?)`).run(m.id, m.chat_id, m.role, m.content, m.created_at || new Date().toISOString());
-        }
-      }
-      for (const m of (raw.mini_messages || [])) {
-        const exists = db.prepare('SELECT id FROM mini_messages WHERE id = ?').get(m.id);
-        if (!exists) {
-          db.prepare(`INSERT INTO mini_messages (id, chat_id, role, content, created_at)
-            VALUES (?, ?, ?, ?, ?)`).run(m.id, m.chat_id, m.role, m.content, m.created_at || new Date().toISOString());
-        }
-      }
-    });
-    migrate();
-    // Rename json so we don't re-migrate
-    fs.renameSync(jsonPath, jsonPath + '.migrated');
-    console.log('[DB] Migrated chat.json → SQLite successfully');
-  } catch (err) {
-    console.error('[DB] Migration error (non-fatal):', err.message);
-  }
-}
-
-console.log('[DB] SQLite database ready:', dbPath);
+// Test connection on startup
+pool.query('SELECT NOW()').then(() => {
+  console.log('[DB] Connected to Supabase PostgreSQL ✅');
+}).catch(err => {
+  console.error('[DB] Connection failed:', err.message);
+});
 
 // ===== User Operations =====
 
-function getUserByEmail(email) {
-  const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  return row ? rowToUser(row) : null;
+async function getUserByEmail(email) {
+  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+  return rows[0] ? rowToUser(rows[0]) : null;
 }
 
-function getUserById(id) {
-  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-  return row ? rowToUser(row) : null;
+async function getUserById(id) {
+  const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+  return rows[0] ? rowToUser(rows[0]) : null;
 }
 
 function rowToUser(row) {
@@ -135,28 +35,31 @@ function rowToUser(row) {
     name: row.name,
     email: row.email,
     password: row.password,
-    isPremium: row.is_premium === 1,
+    isPremium: row.is_premium === 1 || row.is_premium === true,
     premiumExpiry: row.premium_expiry || null,
     premiumActivatedAt: row.premium_activated_at || null,
     created_at: row.created_at
   };
 }
 
-function createUser(name, email, hashedPassword) {
+async function createUser(name, email, hashedPassword) {
   const id = uuidv4();
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO users (id, name, email, password, is_premium, premium_expiry, premium_activated_at, created_at)
-    VALUES (?, ?, ?, ?, 0, NULL, NULL, ?)`).run(id, name, email, hashedPassword, now);
+  await pool.query(
+    `INSERT INTO users (id, name, email, password, is_premium, premium_expiry, premium_activated_at, created_at)
+     VALUES ($1, $2, $3, $4, 0, NULL, NULL, $5)`,
+    [id, name, email, hashedPassword, now]
+  );
   return getUserById(id);
 }
 
-function updateUserName(id, name) {
-  db.prepare('UPDATE users SET name = ? WHERE id = ?').run(name.substring(0, 50), id);
+async function updateUserName(id, name) {
+  await pool.query('UPDATE users SET name = $1 WHERE id = $2', [name.substring(0, 50), id]);
   return getUserById(id);
 }
 
-function setPremium(id, weeks = 1) {
-  const user = getUserById(id);
+async function setPremium(id, weeks = 1) {
+  const user = await getUserById(id);
   if (!user) return null;
   const now = new Date();
   const base = (user.premiumExpiry && new Date(user.premiumExpiry) > now)
@@ -164,30 +67,34 @@ function setPremium(id, weeks = 1) {
     : now;
   base.setDate(base.getDate() + weeks * 7);
   const activatedAt = user.premiumActivatedAt || now.toISOString();
-  db.prepare(`UPDATE users SET is_premium = 1, premium_expiry = ?, premium_activated_at = ? WHERE id = ?`)
-    .run(base.toISOString(), activatedAt, id);
+  await pool.query(
+    `UPDATE users SET is_premium = 1, premium_expiry = $1, premium_activated_at = $2 WHERE id = $3`,
+    [base.toISOString(), activatedAt, id]
+  );
   return getUserById(id);
 }
 
-function isPremiumActive(id) {
-  const row = db.prepare('SELECT is_premium, premium_expiry FROM users WHERE id = ?').get(id);
-  if (!row || !row.is_premium || !row.premium_expiry) return false;
-  return new Date(row.premium_expiry) > new Date();
+async function isPremiumActive(id) {
+  const { rows } = await pool.query('SELECT is_premium, premium_expiry FROM users WHERE id = $1', [id]);
+  if (!rows[0] || !rows[0].is_premium || !rows[0].premium_expiry) return false;
+  return new Date(rows[0].premium_expiry) > new Date();
 }
 
 // ===== Chat Operations =====
 
-function getAllChats(userId = null) {
-  return db.prepare(`
-    SELECT * FROM chats WHERE user_id IS ? ORDER BY pinned DESC, updated_at DESC
-  `).all(userId).map(rowToChat);
+async function getAllChats(userId = null) {
+  const { rows } = await pool.query(
+    `SELECT * FROM chats WHERE user_id IS NOT DISTINCT FROM $1 ORDER BY pinned DESC, updated_at DESC`,
+    [userId]
+  );
+  return rows.map(rowToChat);
 }
 
-function getChatById(id, userId = undefined) {
-  const row = db.prepare('SELECT * FROM chats WHERE id = ?').get(id);
-  if (!row) return null;
-  if (userId !== undefined && row.user_id !== userId) return null;
-  return rowToChat(row);
+async function getChatById(id, userId = undefined) {
+  const { rows } = await pool.query('SELECT * FROM chats WHERE id = $1', [id]);
+  if (!rows[0]) return null;
+  if (userId !== undefined && rows[0].user_id !== userId) return null;
+  return rowToChat(rows[0]);
 }
 
 function rowToChat(row) {
@@ -195,94 +102,109 @@ function rowToChat(row) {
     id: row.id,
     user_id: row.user_id || null,
     title: row.title,
-    pinned: row.pinned === 1,
+    pinned: row.pinned === 1 || row.pinned === true,
     created_at: row.created_at,
     updated_at: row.updated_at
   };
 }
 
-function createChat(title = 'New Chat', userId = null) {
+async function createChat(title = 'New Chat', userId = null) {
   const id = uuidv4();
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO chats (id, user_id, title, pinned, created_at, updated_at)
-    VALUES (?, ?, ?, 0, ?, ?)`).run(id, userId, title.substring(0, 100), now, now);
+  await pool.query(
+    `INSERT INTO chats (id, user_id, title, pinned, created_at, updated_at) VALUES ($1, $2, $3, 0, $4, $5)`,
+    [id, userId, title.substring(0, 100), now, now]
+  );
   return getChatById(id);
 }
 
-function updateChatTitle(id, title, userId = undefined) {
-  const chat = getChatById(id, userId);
+async function updateChatTitle(id, title, userId = undefined) {
+  const chat = await getChatById(id, userId);
   if (!chat) return null;
   const now = new Date().toISOString();
-  db.prepare('UPDATE chats SET title = ?, updated_at = ? WHERE id = ?').run(title.substring(0, 100), now, id);
+  await pool.query('UPDATE chats SET title = $1, updated_at = $2 WHERE id = $3', [title.substring(0, 100), now, id]);
   return getChatById(id);
 }
 
-function togglePinChat(id, userId = undefined) {
-  const chat = getChatById(id, userId);
+async function togglePinChat(id, userId = undefined) {
+  const chat = await getChatById(id, userId);
   if (!chat) return null;
   const now = new Date().toISOString();
-  db.prepare('UPDATE chats SET pinned = ?, updated_at = ? WHERE id = ?').run(chat.pinned ? 0 : 1, now, id);
+  const newPin = chat.pinned ? 0 : 1;
+  await pool.query('UPDATE chats SET pinned = $1, updated_at = $2 WHERE id = $3', [newPin, now, id]);
   return getChatById(id);
 }
 
-function deleteChat(id, userId = undefined) {
-  const chat = getChatById(id, userId);
+async function deleteChat(id, userId = undefined) {
+  const chat = await getChatById(id, userId);
   if (!chat) return false;
-  db.prepare('DELETE FROM messages WHERE chat_id = ?').run(id);
-  db.prepare('DELETE FROM mini_messages WHERE chat_id = ?').run(id);
-  db.prepare('DELETE FROM chats WHERE id = ?').run(id);
+  await pool.query('DELETE FROM messages WHERE chat_id = $1', [id]);
+  await pool.query('DELETE FROM mini_messages WHERE chat_id = $1', [id]);
+  await pool.query('DELETE FROM chats WHERE id = $1', [id]);
   return true;
 }
 
-function clearAllChats(userId = null) {
-  const chats = db.prepare('SELECT id FROM chats WHERE user_id IS ?').all(userId);
-  const ids = chats.map(c => c.id);
-  const clear = db.transaction(() => {
-    for (const id of ids) {
-      db.prepare('DELETE FROM messages WHERE chat_id = ?').run(id);
-      db.prepare('DELETE FROM mini_messages WHERE chat_id = ?').run(id);
-    }
-    db.prepare('DELETE FROM chats WHERE user_id IS ?').run(userId);
-  });
-  clear();
+async function clearAllChats(userId = null) {
+  const { rows } = await pool.query('SELECT id FROM chats WHERE user_id IS NOT DISTINCT FROM $1', [userId]);
+  const ids = rows.map(r => r.id);
+  for (const id of ids) {
+    await pool.query('DELETE FROM messages WHERE chat_id = $1', [id]);
+    await pool.query('DELETE FROM mini_messages WHERE chat_id = $1', [id]);
+  }
+  await pool.query('DELETE FROM chats WHERE user_id IS NOT DISTINCT FROM $1', [userId]);
   return ids.length;
 }
 
-function migrateGuestChats(sessionId, newUserId) {
+async function migrateGuestChats(sessionId, newUserId) {
   if (!sessionId || !newUserId) return;
-  db.prepare('UPDATE chats SET user_id = ? WHERE user_id = ?').run(newUserId, sessionId);
+  await pool.query('UPDATE chats SET user_id = $1 WHERE user_id = $2', [newUserId, sessionId]);
 }
 
 // ===== Message Operations =====
 
-function getMessages(chatId) {
-  return db.prepare('SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC').all(chatId);
+async function getMessages(chatId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM messages WHERE chat_id = $1 ORDER BY created_at ASC',
+    [chatId]
+  );
+  return rows;
 }
 
-function addMessage(chatId, role, content) {
+async function addMessage(chatId, role, content) {
   const id = uuidv4();
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO messages (id, chat_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .run(id, chatId, role, content.substring(0, 20000), now);
-  db.prepare('UPDATE chats SET updated_at = ? WHERE id = ?').run(now, chatId);
-  return db.prepare('SELECT * FROM messages WHERE id = ?').get(id);
+  await pool.query(
+    `INSERT INTO messages (id, chat_id, role, content, created_at) VALUES ($1, $2, $3, $4, $5)`,
+    [id, chatId, role, content.substring(0, 100000), now]
+  );
+  const { rows } = await pool.query('SELECT * FROM messages WHERE id = $1', [id]);
+  return rows[0];
 }
 
-// ===== Mini Message Operations =====
+// ===== Mini Messages =====
 
-function getMiniMessages(chatId) {
-  return db.prepare('SELECT * FROM mini_messages WHERE chat_id = ? ORDER BY created_at ASC').all(chatId);
+async function getMiniMessages(chatId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM mini_messages WHERE chat_id = $1 ORDER BY created_at ASC',
+    [chatId]
+  );
+  return rows;
 }
 
-function addMiniMessage(chatId, role, content) {
+async function addMiniMessage(chatId, role, content) {
   const id = uuidv4();
   const now = new Date().toISOString();
-  db.prepare(`INSERT INTO mini_messages (id, chat_id, role, content, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .run(id, chatId, role, content.substring(0, 5000), now);
-  return db.prepare('SELECT * FROM mini_messages WHERE id = ?').get(id);
+  await pool.query(
+    `INSERT INTO mini_messages (id, chat_id, role, content, created_at) VALUES ($1, $2, $3, $4, $5)`,
+    [id, chatId, role, content.substring(0, 5000), now]
+  );
+  const { rows } = await pool.query('SELECT * FROM mini_messages WHERE id = $1', [id]);
+  return rows[0];
 }
 
+// Export pool for session store
 module.exports = {
+  pool,
   getUserByEmail,
   getUserById,
   createUser,
@@ -296,9 +218,9 @@ module.exports = {
   togglePinChat,
   deleteChat,
   clearAllChats,
+  migrateGuestChats,
   getMessages,
   addMessage,
   getMiniMessages,
-  addMiniMessage,
-  migrateGuestChats
+  addMiniMessage
 };

@@ -46,12 +46,12 @@ module.exports.getUserIdFromReq = getUserIdFromReq;
 router.get('/dev-login', async (req, res) => {
   try {
     const devEmail = 'prudhvisiva03@gmail.com';
-    let user = db.getUserByEmail(devEmail);
+    let user = await db.getUserByEmail(devEmail);
     if (!user) {
       const hash = await bcrypt.hash('devpassword123', 10);
-      user = db.createUser('PRUDHVI SIVA', devEmail, hash);
+      user = await db.createUser('PRUDHVI SIVA', devEmail, hash);
     }
-    db.setPremium(user.id, 52); // 1 year premium
+    await db.setPremium(user.id, 52); // 1 year premium
     issueToken(res, user.id);
     req.session.userId = user.id;
     res.redirect('/');
@@ -75,15 +75,15 @@ router.post('/register', async (req, res) => {
     const cleanName = name.trim().substring(0, 50);
     const cleanEmail = email.trim().toLowerCase().substring(0, 100);
 
-    const existing = db.getUserByEmail(cleanEmail);
+    const existing = await db.getUserByEmail(cleanEmail);
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
     const hash = await bcrypt.hash(password, 10);
-    const user = db.createUser(cleanName, cleanEmail, hash);
+    const user = await db.createUser(cleanName, cleanEmail, hash);
 
     // Migrate any guest chats
     const guestId = req.session && req.session.userId ? null : req.sessionID;
-    if (guestId) db.migrateGuestChats(guestId, user.id);
+    if (guestId) await db.migrateGuestChats(guestId, user.id);
 
     issueToken(res, user.id);
     req.session.userId = user.id;
@@ -106,7 +106,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = db.getUserByEmail(cleanEmail);
+    const user = await db.getUserByEmail(cleanEmail);
     if (!user) return res.status(401).json({ error: 'Invalid email or password' });
 
     const valid = await bcrypt.compare(password, user.password);
@@ -114,7 +114,7 @@ router.post('/login', async (req, res) => {
 
     // Migrate any guest chats
     const guestId = req.sessionID;
-    if (guestId) db.migrateGuestChats(guestId, user.id);
+    if (guestId) await db.migrateGuestChats(guestId, user.id);
 
     issueToken(res, user.id);
     req.session.userId = user.id;
@@ -158,20 +158,20 @@ router.post('/google', async (req, res) => {
       return res.status(400).json({ error: 'Invalid Google token' });
 
     const cleanEmail = payload.email.toLowerCase();
-    let user = db.getUserByEmail(cleanEmail);
+    let user = await db.getUserByEmail(cleanEmail);
     const displayName = payload.name || cleanEmail.split('@')[0];
 
     if (!user) {
       const randomPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
       const hash = await bcrypt.hash(randomPassword, 10);
-      user = db.createUser(displayName, cleanEmail, hash);
+      user = await db.createUser(displayName, cleanEmail, hash);
     } else if (user.name === 'Google User') {
-      user = db.updateUserName(user.id, displayName);
+      user = await db.updateUserName(user.id, displayName);
     }
 
     // Migrate any guest chats
     const guestId = req.sessionID;
-    if (guestId) db.migrateGuestChats(guestId, user.id);
+    if (guestId) await db.migrateGuestChats(guestId, user.id);
 
     issueToken(res, user.id);
     req.session.userId = user.id;
@@ -191,14 +191,14 @@ router.post('/logout', (req, res) => {
 });
 
 // ===== Get Current User (/me) =====
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   const userId = getUserIdFromReq(req);
   if (!userId) return res.json({ user: null });
 
-  const user = db.getUserById(userId);
+  const user = await db.getUserById(userId);
   if (!user) return res.json({ user: null });
 
-  const isPremium = db.isPremiumActive(userId);
+  const isPremium = await db.isPremiumActive(userId);
   res.json({
     user: {
       id: user.id,

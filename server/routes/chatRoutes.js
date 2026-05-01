@@ -2,23 +2,20 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 const { generateMainResponse, generateChatTitle } = require('../services/aiService');
-
 const { getUserIdFromReq } = require('./authRoutes');
 
 // Helper — get userId from JWT cookie or session
 function getUserId(req) {
-  // Try JWT first (persistent across server restarts)
   const userId = getUserIdFromReq(req);
   if (userId) return userId;
-  // Guest: use session ID (scoped to browser tab)
   if (req.session) req.session.isGuest = true;
   return req.sessionID || 'guest_unknown';
 }
 
 // Get all chats (user-scoped)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const chats = db.getAllChats(getUserId(req));
+    const chats = await db.getAllChats(getUserId(req));
     res.json(chats);
   } catch (err) {
     console.error('[chatRoutes] GET / error:', err.message);
@@ -27,13 +24,13 @@ router.get('/', (req, res) => {
 });
 
 // Create new chat (user-scoped)
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const title = req.body.title;
     const cleanTitle = (typeof title === 'string' && title.trim())
       ? title.trim()
       : 'New Chat';
-    const chat = db.createChat(cleanTitle, getUserId(req));
+    const chat = await db.createChat(cleanTitle, getUserId(req));
     res.status(201).json(chat);
   } catch (err) {
     console.error('[chatRoutes] POST / error:', err.message);
@@ -42,9 +39,9 @@ router.post('/', (req, res) => {
 });
 
 // Bulk delete ALL chats for this user
-router.delete('/', (req, res) => {
+router.delete('/', async (req, res) => {
   try {
-    const count = db.clearAllChats(getUserId(req));
+    const count = await db.clearAllChats(getUserId(req));
     res.json({ success: true, deleted: count });
   } catch (err) {
     console.error('[chatRoutes] DELETE / error:', err.message);
@@ -53,9 +50,9 @@ router.delete('/', (req, res) => {
 });
 
 // Delete a single chat (ownership-checked)
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    const deleted = db.deleteChat(req.params.id, getUserId(req));
+    const deleted = await db.deleteChat(req.params.id, getUserId(req));
     if (!deleted) {
       return res.status(404).json({ error: 'Chat not found' });
     }
@@ -67,13 +64,13 @@ router.delete('/:id', (req, res) => {
 });
 
 // Rename a chat (ownership-checked)
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { title } = req.body;
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({ error: 'Title is required' });
     }
-    const chat = db.updateChatTitle(req.params.id, title.trim(), getUserId(req));
+    const chat = await db.updateChatTitle(req.params.id, title.trim(), getUserId(req));
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
@@ -85,9 +82,9 @@ router.put('/:id', (req, res) => {
 });
 
 // Pin/Unpin a chat
-router.put('/:id/pin', (req, res) => {
+router.put('/:id/pin', async (req, res) => {
   try {
-    const chat = db.togglePinChat(req.params.id, getUserId(req));
+    const chat = await db.togglePinChat(req.params.id, getUserId(req));
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
@@ -99,13 +96,13 @@ router.put('/:id/pin', (req, res) => {
 });
 
 // Get messages for a chat (no ownership check — chat UUID is enough security)
-router.get('/:id/messages', (req, res) => {
+router.get('/:id/messages', async (req, res) => {
   try {
-    const chat = db.getChatById(req.params.id);
+    const chat = await db.getChatById(req.params.id);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
-    const messages = db.getMessages(req.params.id);
+    const messages = await db.getMessages(req.params.id);
     res.json(messages);
   } catch (err) {
     console.error('[chatRoutes] GET messages error:', err.message);
@@ -126,43 +123,46 @@ router.post('/:id/messages', async (req, res) => {
       return res.status(400).json({ error: 'Message too long (max 20,000 characters)' });
     }
 
-    // Look up chat WITHOUT ownership check — chat UUID is unguessable, that's enough security
-    const chat = db.getChatById(chatId);
+    // Look up chat WITHOUT ownership check — chat UUID is unguessable
+    const chat = await db.getChatById(chatId);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
     const cleanContent = content.trim();
-    const userMsg = db.addMessage(chatId, 'user', cleanContent);
+    const userMsg = await db.addMessage(chatId, 'user', cleanContent);
 
-    // Fix race condition: await title gen (with 3s timeout) before responding
+    // Auto-generate title for new chats
     if (chat.title === 'New Chat') {
       try {
         const title = await Promise.race([
           generateChatTitle(cleanContent),
           new Promise(resolve => setTimeout(() => resolve(null), 3000))
         ]);
-        if (title) db.updateChatTitle(chatId, title);
+        if (title) await db.updateChatTitle(chatId, title);
       } catch (err) {
         console.error('[Title Gen Error]', err.message);
       }
     }
 
-    // Unrestricted Mode — allow any logged-in user who explicitly toggled it on.
-    // Guests (not logged in) are blocked. req.session.userId is the reliable logged-in check.
+    // Unrestricted Mode — only for logged-in users who toggled it on
     let isUnrestricted = false;
     if (unrestrictedMode && req.session && req.session.userId) {
       isUnrestricted = true;
     }
+    // Also check JWT
+    if (unrestrictedMode && getUserIdFromReq(req)) {
+      isUnrestricted = true;
+    }
 
-    const history = db.getMessages(chatId);
+    const history = await db.getMessages(chatId);
     const aiText = await generateMainResponse(cleanContent, history, {
       model: model || 'smart-ai-1',
       customInstructions: customInstructions || '',
       unrestrictedMode: isUnrestricted
     });
-    const aiMsg = db.addMessage(chatId, 'assistant', aiText);
-    const updatedChat = db.getChatById(chatId);
+    const aiMsg = await db.addMessage(chatId, 'assistant', aiText);
+    const updatedChat = await db.getChatById(chatId);
 
     res.json({
       userMessage: userMsg,

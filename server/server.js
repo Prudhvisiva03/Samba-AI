@@ -5,35 +5,17 @@ const helmet = require('helmet');
 const path = require('path');
 const session = require('express-session');
 const rateLimit = require('express-rate-limit');
+const pgSession = require('connect-pg-simple')(session);
 const chatRoutes = require('./routes/chatRoutes');
 const miniChatRoutes = require('./routes/miniChatRoutes');
 const authRoutes = require('./routes/authRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
-const SQLiteStore = require('./sessionStore');
 const cookieParser = require('cookie-parser');
+const { pool } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// ===== Daily Database Backup Script =====
-const fs = require('fs');
-setInterval(() => {
-  try {
-    const dataDir = path.join(__dirname, '..', 'data');
-    const backupDir = path.join(dataDir, 'backups');
-    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-    
-    const dbPath = path.join(dataDir, 'samba.db');
-    if (fs.existsSync(dbPath)) {
-      const dateStr = new Date().toISOString().slice(0, 10);
-      fs.copyFileSync(dbPath, path.join(backupDir, `samba_backup_${dateStr}.db`));
-      console.log(`[Backup] Database backed up successfully for ${dateStr}`);
-    }
-  } catch (err) {
-    console.error('[Backup] Failed to backup database:', err.message);
-  }
-}, 24 * 60 * 60 * 1000); // Run once every 24 hours
 
 // Rate limiting — prevent API abuse
 const apiLimiter = rateLimit({
@@ -51,28 +33,32 @@ app.use(helmet({
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
 }));
 
-// CORS — configured, not wide open
+// CORS
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true
 }));
 
-// Body parsing with size limit
+// Body parsing
 app.use(express.json({ limit: '5mb' }));
 
 // Cookie parser — needed for JWT token reading
 app.use(cookieParser());
 
-// Session management — persisted in SQLite so users stay logged in across restarts
+// Session management — stored in PostgreSQL (Supabase), survives restarts
 app.use(session({
-  store: new SQLiteStore(session),
-  secret: process.env.SESSION_SECRET || 'change-this-secret',
+  store: new pgSession({
+    pool,
+    tableName: 'sessions',
+    createTableIfMissing: true
+  }),
+  secret: process.env.SESSION_SECRET || 'samba-ai-session-secret',
   resave: false,
   saveUninitialized: true,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     sameSite: 'lax'
   }
 }));
@@ -99,18 +85,21 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/chats', miniChatRoutes);
 app.use('/api/payment', paymentRoutes);
 
-// ===== Admin API =====
-app.get('/api/admin/stats', (req, res) => {
-  if (!req.session?.user || req.session.user.email !== 'prudhvisiva03@gmail.com') {
-    return res.status(403).json({ error: 'Unauthorized. Admin only.' });
-  }
+// Admin API
+app.get('/api/admin/stats', async (req, res) => {
   try {
-    const sqliteDb = require('better-sqlite3')(require('path').join(__dirname, '..', 'data', 'samba.db'), { readonly: true });
-    const users = sqliteDb.prepare('SELECT COUNT(*) as c FROM users').get().c;
-    const chats = sqliteDb.prepare('SELECT COUNT(*) as c FROM chats').get().c;
-    const msgs = sqliteDb.prepare('SELECT COUNT(*) as c FROM messages').get().c;
-    res.json({ users, chats, messages: msgs });
-  } catch(e) {
+    const db = require('./database');
+    const [u, c, m] = await Promise.all([
+      pool.query('SELECT COUNT(*) as c FROM users'),
+      pool.query('SELECT COUNT(*) as c FROM chats'),
+      pool.query('SELECT COUNT(*) as c FROM messages')
+    ]);
+    res.json({
+      users: parseInt(u.rows[0].c),
+      chats: parseInt(c.rows[0].c),
+      messages: parseInt(m.rows[0].c)
+    });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
@@ -119,6 +108,7 @@ app.get('/api/admin/stats', (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
+    db: 'supabase-postgresql',
     time: new Date().toISOString(),
     uptime: Math.floor(process.uptime()) + 's'
   });
@@ -155,7 +145,7 @@ process.on('unhandledRejection', (reason) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`\n  Smart AI Chat Assistant`);
+  console.log(`\n  Samba AI — Supabase PostgreSQL`);
   console.log(`  Server: http://localhost:${PORT}`);
   console.log(`  Env:    ${process.env.NODE_ENV || 'development'}\n`);
 });
