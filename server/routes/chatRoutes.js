@@ -148,17 +148,11 @@ router.post('/:id/messages', async (req, res) => {
       }
     }
 
-    // Security check for Unrestricted Mode — allow premium users OR dev account
+    // Unrestricted Mode — allow any logged-in user who explicitly toggled it on.
+    // Guests (not logged in) are blocked. req.session.userId is the reliable logged-in check.
     let isUnrestricted = false;
-    if (unrestrictedMode) {
-      const userId = getUserId(req);
-      if (userId) {
-        const isPremium = db.isPremiumActive(userId);
-        const user = db.getUserById(userId);
-        if (isPremium || (user && user.email === 'prudhvisiva03@gmail.com')) {
-          isUnrestricted = true;
-        }
-      }
+    if (unrestrictedMode && req.session && req.session.userId) {
+      isUnrestricted = true;
     }
 
     const history = db.getMessages(chatId);
