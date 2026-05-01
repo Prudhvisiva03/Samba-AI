@@ -5,7 +5,10 @@ const { generateHelpResponse } = require('../services/aiService');
 
 // Helper — get userId from session
 function getUserId(req) {
-  return (req.session && req.session.userId) ? req.session.userId : null;
+  if (req.session && req.session.userId) {
+    return req.session.userId;
+  }
+  return req.sessionID || 'guest_unknown';
 }
 
 // Get mini messages for a chat

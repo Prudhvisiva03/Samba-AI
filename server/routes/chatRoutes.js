@@ -3,9 +3,12 @@ const router = express.Router();
 const db = require('../database');
 const { generateMainResponse, generateChatTitle } = require('../services/aiService');
 
-// Helper — get userId from session (null = guest)
+// Helper — get userId from session (guest uses session ID)
 function getUserId(req) {
-  return (req.session && req.session.userId) ? req.session.userId : null;
+  if (req.session && req.session.userId) {
+    return req.session.userId;
+  }
+  return req.sessionID || 'guest_unknown';
 }
 
 // Get all chats (user-scoped)
