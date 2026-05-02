@@ -45,20 +45,15 @@ app.use(express.json({ limit: '5mb' }));
 // Cookie parser — needed for JWT token reading
 app.use(cookieParser());
 
-// Session management — stored in PostgreSQL (Supabase), survives restarts
+// Session management — MemoryStore (JWT handles user auth; sessions only used for guest IDs)
 app.use(session({
-  store: new pgSession({
-    pool,
-    tableName: 'sessions',
-    createTableIfMissing: true
-  }),
   secret: process.env.SESSION_SECRET || 'samba-ai-session-secret',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     sameSite: 'lax'
   }
 }));

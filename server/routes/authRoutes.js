@@ -38,9 +38,7 @@ function getUserIdFromReq(req) {
   return null;
 }
 
-// Export helper for use in other routes
-router.getUserId = getUserIdFromReq;
-module.exports.getUserIdFromReq = getUserIdFromReq;
+// Export helper for use in other routes (must be on the router object, overwritten below)
 
 // ===== Developer Instant Login =====
 router.get('/dev-login', async (req, res) => {
@@ -211,3 +209,5 @@ router.get('/me', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.getUserIdFromReq = getUserIdFromReq;
+
