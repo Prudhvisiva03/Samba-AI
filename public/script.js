@@ -1217,40 +1217,72 @@ function applyTheme() {
   }
 }
 
-// ===== Login Modal =====
-userProfile.addEventListener('click', () => {
+// ===== User Panel (profile popup) =====
+const userPanel = document.getElementById('userPanel');
+const userPanelAvatar = document.getElementById('userPanelAvatar');
+const userPanelName = document.getElementById('userPanelName');
+const userPanelEmail = document.getElementById('userPanelEmail');
+const userPanelSignout = document.getElementById('userPanelSignout');
+
+function openUserPanel() {
+  // Sync panel with current user data
   if (currentUser) {
-    showConfirm('Do you want to sign out?', async () => {
-      try { await API.logout(); } catch (e) { /* ignore */ }
-      currentUser = null;
-      localStorage.removeItem('smartai_user');
-      updateUserUI();
-      currentChatId = null;
-      chatTitleEl.textContent = 'Samba AI 1.0';
-      messagesEl.innerHTML = `
-        <div class="welcome-screen">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
-          <h1>How can I help you today?</h1>
-        </div>`;
-      loadChats();
-      showToast('Signed out');
-    }, 'Sign Out');
+    const initials = (currentUser.name || currentUser.email || 'U')
+      .split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    userPanelAvatar.textContent = initials;
+    userPanelName.textContent = currentUser.name || 'User';
+    userPanelEmail.textContent = currentUser.email || '';
+  }
+  userPanel.classList.add('open');
+  userProfile.classList.add('panel-open');
+}
+
+function closeUserPanel() {
+  userPanel.classList.remove('open');
+  userProfile.classList.remove('panel-open');
+}
+
+// ===== Login Modal =====
+userProfile.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (currentUser) {
+    if (userPanel.classList.contains('open')) {
+      closeUserPanel();
+    } else {
+      openUserPanel();
+    }
   } else {
     loginModal.classList.add('open');
   }
 });
 
-loginClose.addEventListener('click', () => {
-  loginModal.classList.remove('open');
+// Sign out from panel
+userPanelSignout.addEventListener('click', async () => {
+  closeUserPanel();
+  try { await API.logout(); } catch (e) { /* ignore */ }
+  currentUser = null;
+  localStorage.removeItem('smartai_user');
+  updateUserUI();
+  currentChatId = null;
+  chatTitleEl.textContent = 'Samba AI 1.0';
+  messagesEl.innerHTML = `
+    <div class="welcome-screen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      <h1>How can I help you today?</h1>
+    </div>`;
+  loadChats();
+  showToast('Signed out');
 });
 
-loginModal.addEventListener('click', (e) => {
-  if (e.target === loginModal) {
-    loginModal.classList.remove('open');
+// Close panel when clicking outside
+document.addEventListener('click', (e) => {
+  if (userPanel.classList.contains('open') && !userPanel.contains(e.target) && !userProfile.contains(e.target)) {
+    closeUserPanel();
   }
 });
+
 
 // Auth Mode Toggle
 let isSignUpMode = false;
@@ -1258,6 +1290,14 @@ const toggleAuthMode = document.getElementById('toggleAuthMode');
 const nameGroup = document.getElementById('nameGroup');
 const loginModalSubtitle = document.getElementById('loginModalSubtitle');
 const registerBtn = document.getElementById('registerBtn');
+
+loginClose.addEventListener('click', () => {
+  loginModal.classList.remove('open');
+});
+
+loginModal.addEventListener('click', (e) => {
+  if (e.target === loginModal) loginModal.classList.remove('open');
+});
 
 toggleAuthMode.addEventListener('click', (e) => {
   e.preventDefault();

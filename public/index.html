@@ -100,12 +100,34 @@
           </svg>
           <span>Settings</span>
         </button>
+        <!-- User Panel Dropdown (appears on profile click) -->
+        <div class="user-panel" id="userPanel">
+          <div class="user-panel-header">
+            <div class="user-panel-avatar" id="userPanelAvatar">P</div>
+            <div class="user-panel-details">
+              <span class="user-panel-name" id="userPanelName">Prudhvi Siva</span>
+              <span class="user-panel-email" id="userPanelEmail">prudhvisiva03@gmail.com</span>
+            </div>
+          </div>
+          <div class="user-panel-divider"></div>
+          <button class="user-panel-signout" id="userPanelSignout">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            <span>Sign out</span>
+          </button>
+        </div>
         <div class="user-profile" id="userProfile">
           <div class="user-avatar" id="userAvatar">G</div>
           <div class="user-info">
             <span class="user-name" id="userName">Guest</span>
             <span class="user-email" id="userEmail">Click to sign in</span>
           </div>
+          <svg class="user-profile-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="18 15 12 9 6 15"/>
+          </svg>
         </div>
       </div>
     </aside>
@@ -501,11 +523,6 @@
       <div class="confirm-actions">
         <button class="confirm-cancel" id="confirmCancel">Cancel</button>
         <button class="confirm-delete" id="confirmDelete">Delete</button>
-        <!-- Contact / Legal Links for Razorpay Approval -->
-        <div style="text-align: center; margin-top: 16px; font-size: 12px; color: var(--text-muted);">
-          By continuing, you agree to our <a href="/terms.html" target="_blank" style="color: var(--accent); text-decoration: none;">Terms of Service</a> & <a href="/privacy.html" target="_blank" style="color: var(--accent); text-decoration: none;">Privacy Policy</a>.<br>
-          <a href="/contact.html" target="_blank" style="color: var(--text-secondary); text-decoration: none; margin-top: 4px; display: inline-block;">Contact Us</a>
-        </div>
       </div>
     </div>
   </div>
