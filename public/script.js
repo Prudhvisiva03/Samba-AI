@@ -1361,7 +1361,8 @@ async function handleGoogleCredentialResponse(response) {
     loginModal.classList.remove('open');
     showToast('Signed in with Google successfully');
   } catch (err) {
-    showToast('Google login failed. Check your connection.');
+    console.error('Google Auth Error:', err);
+    showToast('Google login failed: ' + (err.message || 'Check your connection.'));
   }
 }
 
@@ -1418,9 +1419,10 @@ loginGuest.addEventListener('click', () => {
 
 function updateUserUI() {
   if (currentUser) {
-    userName.textContent = currentUser.name;
+    const displayName = currentUser.name || currentUser.email || 'User';
+    userName.textContent = displayName;
     userEmail.textContent = currentUser.email || 'Signed in';
-    userAvatar.textContent = currentUser.name.charAt(0).toUpperCase();
+    userAvatar.textContent = displayName.charAt(0).toUpperCase();
     
     // Unrestricted mode logic
     if (currentUser.email === 'prudhvisiva03@gmail.com') {
