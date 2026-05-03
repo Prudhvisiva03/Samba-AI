@@ -404,13 +404,21 @@ function startRename(chatId) {
 }
 
 // ===== New Chat =====
-async function createNewChat() {
-  const chat = await API.createChat();
-  chats.unshift(chat);
-  currentChatId = chat.id;
+function createNewChat() {
+  currentChatId = null;
   searchInput.value = '';
-  renderChatList();
+  document.querySelectorAll('.chat-item.active').forEach(el => el.classList.remove('active'));
   showWelcome();
+  
+  // Clear inputs and attachments
+  messageInput.value = '';
+  messageInput.style.height = 'auto'; // reset height
+  updateSendBtnState();
+  if (typeof attachedFiles !== 'undefined') {
+    attachedFiles = [];
+    renderAttachedFiles();
+  }
+
   messageInput.focus();
   // Reset mini chat
   if (miniChat.classList.contains('open')) {
