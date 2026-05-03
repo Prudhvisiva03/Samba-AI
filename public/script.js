@@ -1272,7 +1272,6 @@ userPanelSignout.addEventListener('click', async () => {
       </svg>
       <h1>How can I help you today?</h1>
     </div>`;
-  loadChats();
   showToast('Signed out');
 });
 
@@ -1340,7 +1339,6 @@ loginSubmit.addEventListener('click', async () => {
     localStorage.setItem('smartai_user', JSON.stringify(currentUser));
     localStorage.removeItem('smartai_guest_count'); // reset guest message limit
     updateUserUI();
-    loadChats();
     loginModal.classList.remove('open');
     showToast('Signed in successfully');
   } catch (err) {
@@ -1360,7 +1358,6 @@ async function handleGoogleCredentialResponse(response) {
     localStorage.setItem('smartai_user', JSON.stringify(currentUser));
     localStorage.removeItem('smartai_guest_count'); // reset guest message limit
     updateUserUI();
-    loadChats();
     loginModal.classList.remove('open');
     showToast('Signed in with Google successfully');
   } catch (err) {
@@ -1405,7 +1402,6 @@ if (registerBtn) {
       currentUser = result.user;
       localStorage.setItem('smartai_user', JSON.stringify(currentUser));
       updateUserUI();
-      loadChats();
       loginModal.classList.remove('open');
       showToast('Account created successfully');
     } catch (err) {
