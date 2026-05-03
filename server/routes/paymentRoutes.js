@@ -59,10 +59,12 @@ router.post('/verify', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, isMock } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-    // DEV MOCK MODE: Skip signature verification
-    if (!isMock) {
+    // DEV MOCK MODE: Server independently determines if it should skip signature
+    const isMockServer = !process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('XXXXXXXXXXXXXXXX');
+
+    if (!isMockServer) {
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return res.status(400).json({ error: 'Missing payment details' });
       }

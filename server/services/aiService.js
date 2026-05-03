@@ -79,7 +79,8 @@ function extractImageFiles(content) {
 // Read image file as base64
 function readImageBase64(filename) {
   try {
-    const filePath = path.join(uploadsDir, filename);
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(uploadsDir, safeFilename);
     if (!fs.existsSync(filePath)) return null;
     return fs.readFileSync(filePath).toString('base64');
   } catch (err) {
@@ -102,7 +103,8 @@ function extractTextFiles(content) {
 // Read text file contents safely
 function readTextFile(filename) {
   try {
-    const filePath = path.join(uploadsDir, filename);
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(uploadsDir, safeFilename);
     if (!fs.existsSync(filePath)) return null;
     return fs.readFileSync(filePath, 'utf-8');
   } catch (err) {
