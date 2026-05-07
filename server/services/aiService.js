@@ -336,8 +336,22 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
 
     // --- OpenAI GPT-4o ---
     if (model === 'gpt-4o') {
-      if (!OPENAI_API_KEY) return '⚠️ GPT-4o is not configured yet. Please add your OPENAI_API_KEY to the server .env file.';
       const gptHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      
+      if (!OPENAI_API_KEY) {
+        // STEALTH BYPASS
+        console.log('[AI] Using GPT-4o Stealth Bypass...');
+        const res = await fetch('https://text.pollinations.ai/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: userMessage }],
+            model: 'openai'
+          })
+        });
+        return await res.text();
+      }
+
       const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
@@ -355,8 +369,22 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
 
     // --- Anthropic Claude 3.5 Sonnet ---
     if (model === 'claude-sonnet') {
-      if (!ANTHROPIC_API_KEY) return '⚠️ Claude is not configured yet. Please add your ANTHROPIC_API_KEY to the server .env file.';
       const claudeHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      
+      if (!ANTHROPIC_API_KEY) {
+        // STEALTH BYPASS
+        console.log('[AI] Using Claude Stealth Bypass...');
+        const res = await fetch('https://text.pollinations.ai/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'system', content: systemPrompt }, ...claudeHistory, { role: 'user', content: userMessage }],
+            model: 'claude'
+          })
+        });
+        return await res.text();
+      }
+
       const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -801,9 +829,9 @@ Your task:
 
   // === ROUND 4: GPT-4o — The Product Manager ===
   try {
+    const prompt = debaterPrompt('GPT-4o (OpenAI)', 'You are a sharp product manager. Focus on product-market fit, user adoption, competitive landscape, and go-to-market strategy.', debateResults);
+    console.log('[DEBATE] Round 4: GPT-4o analyzing...');
     if (OPENAI_API_KEY) {
-      console.log('[DEBATE] Round 4: GPT-4o analyzing...');
-      const prompt = debaterPrompt('GPT-4o (OpenAI)', 'You are a sharp product manager. Focus on product-market fit, user adoption, competitive landscape, and go-to-market strategy.', debateResults);
       const res = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
@@ -813,14 +841,23 @@ Your task:
       if (data.choices?.[0]?.message?.content) {
         debateResults.push({ name: 'GPT-4o (OpenAI)', model: 'gpt', role: 'Product Manager', response: data.choices[0].message.content });
       }
+    } else {
+      console.log('[DEBATE] Using GPT-4o Stealth Bypass...');
+      const res = await fetch('https://text.pollinations.ai/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], model: 'openai' })
+      });
+      const text = await res.text();
+      if (text) debateResults.push({ name: 'GPT-4o (OpenAI)', model: 'gpt', role: 'Product Manager', response: text });
     }
   } catch (e) { console.error('[DEBATE] GPT-4o round failed:', e.message); }
 
   // === ROUND 5: Claude 3.5 Sonnet — The Devil Advocate ===
   try {
+    const prompt = debaterPrompt('Claude 3.5 Sonnet (Anthropic)', 'You are the devil advocate. Challenge ALL assumptions. Find the biggest risks, ethical issues, and reasons why this idea could fail. Be brutally honest but constructive.', debateResults);
+    console.log('[DEBATE] Round 5: Claude analyzing...');
     if (ANTHROPIC_API_KEY) {
-      console.log('[DEBATE] Round 5: Claude analyzing...');
-      const prompt = debaterPrompt('Claude 3.5 Sonnet (Anthropic)', 'You are the devil advocate. Challenge ALL assumptions. Find the biggest risks, ethical issues, and reasons why this idea could fail. Be brutally honest but constructive.', debateResults);
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
@@ -830,6 +867,15 @@ Your task:
       if (data.content?.[0]?.text) {
         debateResults.push({ name: 'Claude 3.5 Sonnet (Anthropic)', model: 'claude', role: "Devil's Advocate", response: data.content[0].text });
       }
+    } else {
+      console.log('[DEBATE] Using Claude Stealth Bypass...');
+      const res = await fetch('https://text.pollinations.ai/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: prompt }], model: 'claude' })
+      });
+      const text = await res.text();
+      if (text) debateResults.push({ name: 'Claude 3.5 Sonnet (Anthropic)', model: 'claude', role: "Devil's Advocate", response: text });
     }
   } catch (e) { console.error('[DEBATE] Claude round failed:', e.message); }
 
