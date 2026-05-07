@@ -628,5 +628,132 @@ async function generateChatTitle(userMessage) {
 module.exports = {
   generateMainResponse,
   generateHelpResponse,
-  generateChatTitle
+  generateChatTitle,
+  runAIDebate
 };
+
+// ===== AI DEBATE ENGINE =====
+// Multiple AI models debate a project idea and produce a final synthesis
+async function runAIDebate(projectIdea) {
+  const debateResults = [];
+
+  const debaterPrompt = (name, role, previousDebates) => {
+    let context = '';
+    if (previousDebates.length > 0) {
+      context = '\n\n### PREVIOUS AI PERSPECTIVES (Read these and RESPOND to them — agree, disagree, or build upon them):\n';
+      previousDebates.forEach(d => {
+        context += `\n**${d.name}:** ${d.response.substring(0, 800)}...\n`;
+      });
+    }
+    return `You are ${name}, an AI debater. Your role: ${role}
+
+PROJECT IDEA TO DEBATE: "${projectIdea}"
+${context}
+
+Your task:
+1. Analyze the project idea from your unique perspective
+2. ${previousDebates.length > 0 ? 'RESPOND to what the previous AIs said — agree with good points, challenge weak ones' : 'Be the FIRST to analyze this idea'}
+3. Provide: Strengths, Weaknesses, Unique insights, and 2-3 specific improvement suggestions
+4. Be direct, opinionated, and constructive. Max 250 words.
+5. Start with a bold one-line verdict on the idea.`;
+  };
+
+  // === ROUND 1: Groq (LLaMA 3.3) — The Pragmatic Engineer ===
+  try {
+    if (GROQ_API_KEY) {
+      console.log('[DEBATE] Round 1: Groq analyzing...');
+      const prompt = debaterPrompt('Groq (LLaMA 3.3)', 'You are a pragmatic software engineer. Focus on technical feasibility, implementation challenges, and market reality.', []);
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.8,
+          max_tokens: 400
+        })
+      });
+      const data = await res.json();
+      if (data.choices?.[0]?.message?.content) {
+        debateResults.push({ name: 'Groq (LLaMA 3.3)', model: 'groq', role: 'Pragmatic Engineer', response: data.choices[0].message.content });
+      }
+    }
+  } catch (e) { console.error('[DEBATE] Groq round failed:', e.message); }
+
+  // === ROUND 2: Gemini — The Creative Strategist ===
+  try {
+    if (genAI) {
+      console.log('[DEBATE] Round 2: Gemini analyzing...');
+      const prompt = debaterPrompt('Gemini (Google)', 'You are a creative business strategist and UX designer. Focus on user experience, market differentiation, monetization, and creative possibilities.', debateResults);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { temperature: 0.9, maxOutputTokens: 400 } });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      if (text) {
+        debateResults.push({ name: 'Gemini (Google)', model: 'gemini', role: 'Creative Strategist', response: text });
+      }
+    }
+  } catch (e) { console.error('[DEBATE] Gemini round failed:', e.message); }
+
+  // === ROUND 3: NVIDIA Nemotron — The Research Scientist ===
+  try {
+    if (NVIDIA_API_KEY) {
+      console.log('[DEBATE] Round 3: NVIDIA analyzing...');
+      const prompt = debaterPrompt('NVIDIA Nemotron Ultra', 'You are a deep research scientist and systems architect. Focus on scalability, AI/ML integration opportunities, technical depth, and long-term roadmap.', debateResults);
+      const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
+        body: JSON.stringify({
+          model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.8,
+          max_tokens: 400
+        })
+      });
+      const data = await res.json();
+      if (data.choices?.[0]?.message?.content) {
+        debateResults.push({ name: 'NVIDIA Nemotron Ultra', model: 'nvidia', role: 'Research Scientist', response: data.choices[0].message.content });
+      }
+    }
+  } catch (e) { console.error('[DEBATE] NVIDIA round failed:', e.message); }
+
+  // === FINAL SYNTHESIS: Best available model creates the verdict ===
+  let synthesis = '';
+  try {
+    const allDebate = debateResults.map(d => `**${d.name} (${d.role}):**\n${d.response}`).join('\n\n---\n\n');
+    const synthesisPrompt = `You have watched a debate between multiple AI systems about this project idea: "${projectIdea}"
+
+Here are all their perspectives:
+${allDebate}
+
+Now create the FINAL VERDICT (max 200 words):
+1. **Overall Verdict**: Is this a STRONG, MODERATE, or WEAK idea and why?
+2. **Top 3 Strengths** (bullet points, agreed upon by multiple AIs)
+3. **Top 3 Risks/Weaknesses** (bullet points)
+4. **3 Concrete Improvements** to make this idea significantly better
+5. **Final Score**: X/10 with one-line justification
+
+Be direct and honest. This is the final synthesis that the user will act upon.`;
+
+    if (GROQ_API_KEY) {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: synthesisPrompt }],
+          temperature: 0.5,
+          max_tokens: 500
+        })
+      });
+      const data = await res.json();
+      synthesis = data.choices?.[0]?.message?.content || '';
+    } else if (genAI) {
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { temperature: 0.5, maxOutputTokens: 500 } });
+      const result = await model.generateContent(synthesisPrompt);
+      synthesis = result.response.text();
+    }
+  } catch (e) { console.error('[DEBATE] Synthesis failed:', e.message); }
+
+  return { debates: debateResults, synthesis };
+}
+

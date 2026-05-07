@@ -11,6 +11,7 @@ const miniChatRoutes = require('./routes/miniChatRoutes');
 const authRoutes = require('./routes/authRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const debateRoutes = require('./routes/debateRoutes');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./database');
 
@@ -95,6 +96,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/chats', miniChatRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/debate', debateRoutes);
 
 // Admin API
 app.get('/api/admin/stats', async (req, res) => {

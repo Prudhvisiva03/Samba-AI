@@ -1799,3 +1799,141 @@ function showImageLoadingAnimation() {
   scrollToBottom(messagesContainer);
   return wrapper;
 }
+
+// ===== AI DEBATE FEATURE =====
+const debateOverlay    = document.getElementById('debateOverlay');
+const debateClose      = document.getElementById('debateClose');
+const debateRounds     = document.getElementById('debateRounds');
+const debateSynthesis  = document.getElementById('debateSynthesis');
+const debateSynthBody  = document.getElementById('debateSynthesisBody');
+const debateIdeaDisp   = document.getElementById('debateIdeaDisplay');
+const debateLoadingBar = document.getElementById('debateLoadingBar');
+const debateProgressFill  = document.getElementById('debateProgressFill');
+const debateProgressLabel = document.getElementById('debateProgressLabel');
+const aiDebateToggle   = document.getElementById('aiDebateToggle');
+
+const DEBATE_AIS = [
+  { key: 'groq',   label: 'Groq (LLaMA 3.3)',    initials: 'GQ', role: 'Pragmatic Engineer' },
+  { key: 'gemini', label: 'Gemini (Google)',       initials: 'GE', role: 'Creative Strategist' },
+  { key: 'nvidia', label: 'NVIDIA Nemotron Ultra', initials: 'NV', role: 'Research Scientist' }
+];
+
+function setDebateProgress(pct, label) {
+  debateProgressFill.style.width = pct + '%';
+  debateProgressLabel.textContent = label;
+}
+
+function renderDebateCard(debate) {
+  const card = document.createElement('div');
+  card.className = `debate-card ${debate.model}`;
+  const parsed = typeof marked !== 'undefined' ? marked.parse(debate.response) : debate.response.replace(/\n/g, '<br>');
+  card.innerHTML = `
+    <div class="debate-card-header">
+      <div class="debate-ai-avatar">${DEBATE_AIS.find(a => a.key === debate.model)?.initials || 'AI'}</div>
+      <div>
+        <div class="debate-ai-name">${debate.name}</div>
+        <div class="debate-ai-role">${debate.role}</div>
+      </div>
+    </div>
+    <div class="debate-card-body">${parsed}</div>
+  `;
+  debateRounds.appendChild(card);
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function startDebate(idea) {
+  // Reset UI
+  debateRounds.innerHTML = '';
+  debateSynthesis.style.display = 'none';
+  debateSynthBody.innerHTML = '';
+  debateIdeaDisp.innerHTML = `<strong>💡 Idea:</strong> ${idea}`;
+  debateLoadingBar.style.display = 'flex';
+  debateOverlay.style.display = 'flex';
+  setDebateProgress(5, 'Sending your idea to the AI panel...');
+
+  try {
+    // Fake progress animation steps while waiting
+    const steps = [
+      { pct: 20, msg: '🟣 Groq (LLaMA 3.3) is analyzing your idea...' },
+      { pct: 45, msg: '🔵 Gemini is countering Groq\'s arguments...' },
+      { pct: 68, msg: '🟢 NVIDIA Nemotron is adding deep research perspective...' },
+      { pct: 85, msg: '⭐ Synthesizing the final verdict...' }
+    ];
+
+    let stepIndex = 0;
+    const progressTimer = setInterval(() => {
+      if (stepIndex < steps.length) {
+        setDebateProgress(steps[stepIndex].pct, steps[stepIndex].msg);
+        stepIndex++;
+      } else {
+        clearInterval(progressTimer);
+      }
+    }, 6000);
+
+    const res = await fetch('/api/debate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idea })
+    });
+
+    clearInterval(progressTimer);
+    const data = await res.json();
+
+    if (data.error) {
+      showToast('Debate failed: ' + data.error);
+      debateOverlay.style.display = 'none';
+      return;
+    }
+
+    setDebateProgress(100, 'Debate complete!');
+    setTimeout(() => { debateLoadingBar.style.display = 'none'; }, 800);
+
+    // Render each AI's debate card with a stagger
+    if (data.debates && data.debates.length > 0) {
+      data.debates.forEach((debate, i) => {
+        setTimeout(() => renderDebateCard(debate), i * 400);
+      });
+    }
+
+    // Show synthesis after all cards
+    const synthDelay = (data.debates?.length || 0) * 400 + 600;
+    setTimeout(() => {
+      if (data.synthesis) {
+        debateSynthBody.innerHTML = typeof marked !== 'undefined'
+          ? marked.parse(data.synthesis)
+          : data.synthesis.replace(/\n/g, '<br>');
+        debateSynthesis.style.display = 'block';
+        debateSynthesis.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, synthDelay);
+
+  } catch (err) {
+    showToast('Debate failed. Please try again.');
+    debateOverlay.style.display = 'none';
+  }
+}
+
+// Trigger debate from the toggle button (uses current input text or prompts)
+if (aiDebateToggle) {
+  aiDebateToggle.addEventListener('click', () => {
+    const idea = messageInput.value.trim();
+    if (!idea) {
+      showToast('💡 Type your project idea first, then click AI Debate!');
+      messageInput.focus();
+      return;
+    }
+    startDebate(idea);
+  });
+}
+
+// Close debate modal
+if (debateClose) {
+  debateClose.addEventListener('click', () => {
+    debateOverlay.style.display = 'none';
+  });
+}
+if (debateOverlay) {
+  debateOverlay.addEventListener('click', (e) => {
+    if (e.target === debateOverlay) debateOverlay.style.display = 'none';
+  });
+}

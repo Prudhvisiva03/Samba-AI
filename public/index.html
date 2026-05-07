@@ -414,6 +414,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                 <span>Research</span>
               </div>
+              <div id="aiDebateToggle" class="deep-research-toggle" title="AI Debate — Multiple AIs debate your idea" style="background: linear-gradient(135deg, rgba(217,70,239,0.15), rgba(139,92,246,0.15)); border-color: rgba(217,70,239,0.4);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h6"/></svg>
+                <span>AI Debate</span>
+              </div>
             </div>
             
             <div class="attach-menu" id="attachMenu">
@@ -609,6 +613,32 @@
     </div>
   </div>
 
-  <script src="script.js?v=1.1"></script>
+  <!-- ===== AI DEBATE MODAL ===== -->
+  <div id="debateOverlay" class="debate-overlay" style="display:none;">
+    <div class="debate-modal">
+      <div class="debate-header">
+        <div class="debate-header-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>AI Debate Arena</span>
+        </div>
+        <button id="debateClose" class="debate-close-btn">&times;</button>
+      </div>
+      <div class="debate-idea-display" id="debateIdeaDisplay"></div>
+      <div id="debateLoadingBar" class="debate-progress-wrap" style="display:none;">
+        <div class="debate-progress-label" id="debateProgressLabel">Starting debate...</div>
+        <div class="debate-progress-track"><div class="debate-progress-fill" id="debateProgressFill"></div></div>
+      </div>
+      <div class="debate-rounds" id="debateRounds"></div>
+      <div class="debate-synthesis-card" id="debateSynthesis" style="display:none;">
+        <div class="synthesis-header">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Final Verdict
+        </div>
+        <div class="synthesis-body" id="debateSynthesisBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js?v=1.2"></script>
 </body>
 </html>
