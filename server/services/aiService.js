@@ -265,7 +265,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     }
 
     // Enable Image Generation — STRICT: only on explicit draw/generate/create/paint requests
-    const imageGenPrompt = 'IMAGE GENERATION RULE (STRICT): Only generate an image if the user explicitly uses words like "generate image", "draw", "create image", "imagine", "paint", or "make a picture". For ALL other requests including weather, news, facts, coding, math — respond with TEXT ONLY. Do NOT add an image to a text response unless the user specifically asked for one. When generation IS requested: use the exact format `![Image Description](https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true)` with a URL-encoded, detailed prompt.';
+    const imageGenPrompt = 'IMAGE GENERATION RULE (STRICT): Only generate an image if the user explicitly uses words like "generate image", "draw", "create image", "imagine", "paint", or "make a picture". For ALL other requests including weather, news, facts, coding, math — respond with TEXT ONLY. Do NOT add an image to a text response unless the user specifically asked for one. When generation IS requested: use the exact format `![Image Description](https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true)` with a URL-encoded, detailed prompt. DO NOT output conversational text like "Here is your image". JUST output the markdown link and the suggestions block.';
 
     let truthPrompt = '';
     if (truthMode) {
@@ -273,7 +273,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     }
 
     // Force AI to append exact follow-ups which our frontend will intercept
-    const systemPrompt = basePrompt + '\n\n' + securityPrompt + '\n\n' + truthPrompt + '\n\n' + imageGenPrompt + '\n\nIMPORTANT: At the absolute end of your response, always provide exactly 3 relevant follow-up questions the user can ask to dive deeper. You MUST prefix them exactly with "###_SUGGESTIONS_###", followed by each question on a new line starting with "- ".';
+    const systemPrompt = basePrompt + '\n\n' + securityPrompt + '\n\n' + truthPrompt + '\n\n' + imageGenPrompt + '\n\nIMPORTANT: At the absolute end of your response, always provide exactly 3 relevant follow-up questions the user can ask to dive deeper. You MUST prefix them EXACTLY with the literal string "###_SUGGESTIONS_###", followed immediately by each question on a new line starting with "- ". DO NOT write "Here are some suggestions:" or ANY conversational text before the prefix. The string "###_SUGGESTIONS_###" MUST be the absolute start of the suggestions block.';
 
     // Inject Text/Code File Contents into Prompt dynamically FIRST
     const textFilesInfo = extractTextFiles(userMessage);

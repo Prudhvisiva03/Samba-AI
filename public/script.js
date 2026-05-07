@@ -576,10 +576,20 @@ function appendMessage(role, content) {
   let mainContent = content;
   let sugLines = [];
   
-  if (role === 'assistant' && typeof content === 'string' && content.includes('###_SUGGESTIONS_###')) {
-    const parts = content.split('###_SUGGESTIONS_###');
-    mainContent = parts[0].trim();
-    sugLines = parts[1].split('\n').filter(line => line.trim().startsWith('-'));
+  if (role === 'assistant' && typeof content === 'string') {
+    // If it contains the strict prefix, use that
+    if (content.includes('###_SUGGESTIONS_###')) {
+      const parts = content.split('###_SUGGESTIONS_###');
+      mainContent = parts[0].trim();
+      sugLines = parts[1].split('\n').filter(line => line.trim().startsWith('-'));
+    } else {
+      // Fallback: If AI disobeyed and wrote "Here are some suggestions:" instead
+      const fallbackMatch = content.match(/\n\n.*(?:suggestions|follow-up|follow up).*\n((?:- .*\n?)+)$/i);
+      if (fallbackMatch) {
+        mainContent = content.slice(0, fallbackMatch.index).trim();
+        sugLines = fallbackMatch[1].split('\n').filter(line => line.trim().startsWith('-'));
+      }
+    }
   }
 
   div.innerHTML = `
