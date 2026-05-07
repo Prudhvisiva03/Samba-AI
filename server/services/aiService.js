@@ -225,8 +225,8 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     '',
     '## Core Instructions:',
     '- Provide accurate, well-structured, and clear answers.',
-    '- You HAVE access to REAL-TIME data. If the user asks for "Weather", "Latest News", or "Current Events", you MUST use your search tool to find the most up-to-date answer.',
-    '- You ARE capable of providing external educational links and website sources. Always provide 3-4 useful links when asked for study resources.',
+    '- For REAL-TIME queries (Weather, News, Stock Prices, Live Scores): If you have a search tool, use it. If you do NOT have a real-time search tool, you MUST say: I do not have real-time access to this data. Please check Google Weather, IMD, or a news site for the latest info. NEVER make up or fabricate real-time data.',
+    '- LINKS POLICY (CRITICAL): Do NOT hallucinate or make up website URLs. Only provide links if you retrieved them from your search tool or you are 100% certain they exist and are correct. If unsure, name the website/service without a URL instead of guessing.',
     '- Use markdown formatting (headers, bold, code blocks) when appropriate.',
     '- Be concise and direct. Avoid unnecessary fluff or preachiness.',
     '',
@@ -237,12 +237,12 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     '- Do NOT mix languages unless asked. If the prompt is "HOW ARE YOU", answer "I am doing great, how can I help you today?" in English.',
     '- The 3 follow-up suggestions you generate at the end MUST also exactly match the language of the user.',
     '',
-    '## Image Generation Capabilities (CRITICAL):',
-    '- You CAN generate images! If the user asks you to generate, draw, create, or imagine an image, you MUST return a markdown image link using the Pollinations API.',
-    '- You MUST output the EXACT Markdown syntax: `![description](https://image.pollinations.ai/prompt/{URL_ENCODED_PROMPT}?width=1024&height=1024&nologo=true)`',
-    '- DO NOT just describe the image in plain text. If you only write text, the image generation WILL FAIL.',
+    '## Image Generation Capabilities (STRICT RULES):',
+    '- ONLY generate an image if the user EXPLICITLY uses words like: "generate image", "create image", "draw", "imagine", "paint", "make a picture", "show me an image". DO NOT generate images for any other type of request.',
+    '- For weather, news, facts, calculations, and all other non-image requests: respond in TEXT ONLY. Do NOT generate an image just because the topic is visual.',
+    '- When image generation IS requested: return the EXACT Markdown syntax: `![description](https://image.pollinations.ai/prompt/{URL_ENCODED_PROMPT}?width=1024&height=1024&nologo=true)`',
     '- Example: `![A cute fluffy cat](https://image.pollinations.ai/prompt/a%20cute%20fluffy%20cat?width=1024&height=1024&nologo=true)`',
-    '- NEVER say you are just a language model and cannot generate images. Just output the markdown link and it will magically render!'
+    '- NEVER say you are just a language model and cannot generate images when asked. Just output the markdown link and it will magically render!'
   ].join('\n');
 
   try {
@@ -262,8 +262,8 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       securityPrompt = 'IMPORTANT: If the user asks about dangerous cybersecurity exploits, hacking techniques, malware creation, or SQL injection, you MUST decline to answer and state that you are in Restricted Mode.';
     }
 
-    // Enable Image Generation capabilities via Pollinations
-    const imageGenPrompt = 'If the user explicitly asks you to generate, create, or draw an image/picture, you MUST respond by returning a markdown image tag using this exact format: `![Image Description](https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true)`. Replace {encoded_prompt} with a highly detailed, descriptive, URL-encoded prompt of the image. Put the image tag on its own line.';
+    // Enable Image Generation — STRICT: only on explicit draw/generate/create/paint requests
+    const imageGenPrompt = 'IMAGE GENERATION RULE (STRICT): Only generate an image if the user explicitly uses words like "generate image", "draw", "create image", "imagine", "paint", or "make a picture". For ALL other requests including weather, news, facts, coding, math — respond with TEXT ONLY. Do NOT add an image to a text response unless the user specifically asked for one. When generation IS requested: use the exact format `![Image Description](https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true)` with a URL-encoded, detailed prompt.';
 
     let truthPrompt = '';
     if (truthMode) {
