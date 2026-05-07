@@ -1811,16 +1811,7 @@ function showImageLoadingAnimation() {
 }
 
 // ===== AI DEBATE FEATURE =====
-const debateOverlay    = document.getElementById('debateOverlay');
-const debateClose      = document.getElementById('debateClose');
-const debateRounds     = document.getElementById('debateRounds');
-const debateSynthesis  = document.getElementById('debateSynthesis');
-const debateSynthBody  = document.getElementById('debateSynthesisBody');
-const debateIdeaDisp   = document.getElementById('debateIdeaDisplay');
-const debateLoadingBar = document.getElementById('debateLoadingBar');
-const debateProgressFill  = document.getElementById('debateProgressFill');
-const debateProgressLabel = document.getElementById('debateProgressLabel');
-const aiDebateToggle   = document.getElementById('aiDebateToggle');
+const aiDebateToggle = document.getElementById('aiDebateToggle');
 
 const DEBATE_AIS = [
   { key: 'groq',   label: 'Groq (LLaMA 3.3)',             initials: 'GQ', role: 'Pragmatic Engineer' },
@@ -1830,41 +1821,76 @@ const DEBATE_AIS = [
   { key: 'claude', label: 'Claude 3.5 Sonnet (Anthropic)', initials: 'CL', role: "Devil's Advocate" }
 ];
 
-function setDebateProgress(pct, label) {
-  debateProgressFill.style.width = pct + '%';
-  debateProgressLabel.textContent = label;
-}
-
-function renderDebateCard(debate) {
-  const card = document.createElement('div');
-  card.className = `debate-card ${debate.model}`;
-  const parsed = typeof marked !== 'undefined' ? marked.parse(debate.response) : debate.response.replace(/\n/g, '<br>');
-  card.innerHTML = `
-    <div class="debate-card-header">
-      <div class="debate-ai-avatar">${DEBATE_AIS.find(a => a.key === debate.model)?.initials || 'AI'}</div>
-      <div>
-        <div class="debate-ai-name">${debate.name}</div>
-        <div class="debate-ai-role">${debate.role}</div>
-      </div>
-    </div>
-    <div class="debate-card-body">${parsed}</div>
-  `;
-  debateRounds.appendChild(card);
-  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
 async function startDebate(idea) {
-  // Reset UI
-  debateRounds.innerHTML = '';
-  debateSynthesis.style.display = 'none';
-  debateSynthBody.innerHTML = '';
-  debateIdeaDisp.innerHTML = `<strong>💡 Idea:</strong> ${idea}`;
-  debateLoadingBar.style.display = 'flex';
-  debateOverlay.style.display = 'flex';
-  setDebateProgress(5, 'Sending your idea to the AI panel...');
+  // First, append the user's idea as a normal chat message
+  if (!currentChatId) {
+    const chat = await API.createChat();
+    chats.unshift(chat);
+    currentChatId = chat.id;
+    renderChatList();
+  }
+  hideWelcome();
+  
+  // Actually save the idea to the db as a user message
+  await API.sendMessage(currentChatId, `[AI Debate Mode] Analyze this idea: ${idea}`);
+  appendMessage('user', idea);
+  scrollToBottom(chatArea);
+
+  // Create the main wrapper for the debate output
+  const debateWrapper = document.createElement('div');
+  debateWrapper.className = `message-wrapper assistant-wrapper debate-flow-wrapper`;
+  
+  // Master container for the debate
+  const debateContainer = document.createElement('div');
+  debateContainer.className = 'message assistant debate-container';
+  debateContainer.style.flexDirection = 'column';
+  debateContainer.style.alignItems = 'stretch';
+  debateContainer.style.padding = '16px';
+  debateContainer.style.gap = '16px';
+  debateContainer.style.width = '100%';
+  debateContainer.style.maxWidth = '100%';
+  debateContainer.style.background = 'transparent';
+  debateContainer.style.border = 'none';
+  
+  // Header
+  const header = document.createElement('div');
+  header.className = 'debate-header-title';
+  header.innerHTML = `
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    <span>AI Debate Arena</span>
+  `;
+  debateContainer.appendChild(header);
+
+  // Loading Bar
+  const loadingWrap = document.createElement('div');
+  loadingWrap.className = 'debate-progress-wrap';
+  loadingWrap.style.margin = '0';
+  loadingWrap.innerHTML = `
+    <div class="debate-progress-label" id="debateFlowLabel">Sending idea to AI panel...</div>
+    <div class="debate-progress-track">
+      <div class="debate-progress-fill" id="debateFlowFill" style="width: 5%"></div>
+    </div>
+  `;
+  debateContainer.appendChild(loadingWrap);
+  
+  // Cards container
+  const roundsContainer = document.createElement('div');
+  roundsContainer.className = 'debate-rounds';
+  roundsContainer.style.padding = '0';
+  debateContainer.appendChild(roundsContainer);
+
+  debateWrapper.appendChild(debateContainer);
+  messagesContainer.appendChild(debateWrapper);
+  scrollToBottom(chatArea);
+
+  const setProgress = (pct, label) => {
+    const fill = document.getElementById('debateFlowFill');
+    const text = document.getElementById('debateFlowLabel');
+    if (fill) fill.style.width = pct + '%';
+    if (text) text.textContent = label;
+  };
 
   try {
-    // Fake progress animation steps while waiting
     const steps = [
       { pct: 15, msg: '🟣 Groq (LLaMA 3.3) is analyzing your idea...' },
       { pct: 30, msg: '🔵 Gemini is countering Groq\'s arguments...' },
@@ -1877,7 +1903,7 @@ async function startDebate(idea) {
     let stepIndex = 0;
     const progressTimer = setInterval(() => {
       if (stepIndex < steps.length) {
-        setDebateProgress(steps[stepIndex].pct, steps[stepIndex].msg);
+        setProgress(steps[stepIndex].pct, steps[stepIndex].msg);
         stepIndex++;
       } else {
         clearInterval(progressTimer);
@@ -1894,40 +1920,65 @@ async function startDebate(idea) {
     const data = await res.json();
 
     if (data.error) {
-      showToast('Debate failed: ' + data.error);
-      debateOverlay.style.display = 'none';
+      loadingWrap.innerHTML = `<span style="color:var(--text-error, #f87171);">Debate failed: ${data.error}</span>`;
       return;
     }
 
-    setDebateProgress(100, 'Debate complete!');
-    setTimeout(() => { debateLoadingBar.style.display = 'none'; }, 800);
+    setProgress(100, 'Debate complete!');
+    setTimeout(() => { loadingWrap.style.display = 'none'; }, 800);
 
-    // Render each AI's debate card with a stagger
+    // Save final synthesis to chat history so it persists
+    await API.sendMessage(currentChatId, `[Debate Verdict Generated]\n${data.synthesis}`);
+
+    // Render cards
     if (data.debates && data.debates.length > 0) {
       data.debates.forEach((debate, i) => {
-        setTimeout(() => renderDebateCard(debate), i * 400);
+        setTimeout(() => {
+          const card = document.createElement('div');
+          card.className = `debate-card ${debate.model}`;
+          const parsed = typeof marked !== 'undefined' ? marked.parse(debate.response) : debate.response.replace(/\n/g, '<br>');
+          card.innerHTML = `
+            <div class="debate-card-header">
+              <div class="debate-ai-avatar">${DEBATE_AIS.find(a => a.key === debate.model)?.initials || 'AI'}</div>
+              <div>
+                <div class="debate-ai-name">${debate.name}</div>
+                <div class="debate-ai-role">${debate.role}</div>
+              </div>
+            </div>
+            <div class="debate-card-body">${parsed}</div>
+          `;
+          roundsContainer.appendChild(card);
+          scrollToBottom(chatArea);
+        }, i * 400);
       });
     }
 
-    // Show synthesis after all cards
+    // Render synthesis
     const synthDelay = (data.debates?.length || 0) * 400 + 600;
     setTimeout(() => {
       if (data.synthesis) {
-        debateSynthBody.innerHTML = typeof marked !== 'undefined'
-          ? marked.parse(data.synthesis)
-          : data.synthesis.replace(/\n/g, '<br>');
-        debateSynthesis.style.display = 'block';
-        debateSynthesis.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const synthCard = document.createElement('div');
+        synthCard.className = 'debate-synthesis-card';
+        synthCard.style.margin = '16px 0 0 0';
+        const parsed = typeof marked !== 'undefined' ? marked.parse(data.synthesis) : data.synthesis.replace(/\n/g, '<br>');
+        synthCard.innerHTML = `
+          <div class="synthesis-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            Final Verdict Synthesis
+          </div>
+          <div class="synthesis-body">${parsed}</div>
+        `;
+        debateContainer.appendChild(synthCard);
+        scrollToBottom(chatArea);
       }
     }, synthDelay);
 
   } catch (err) {
-    showToast('Debate failed. Please try again.');
-    debateOverlay.style.display = 'none';
+    loadingWrap.innerHTML = `<span style="color:var(--text-error, #f87171);">Debate failed. Please try again.</span>`;
   }
 }
 
-// Trigger debate from the toggle button (uses current input text or prompts)
+// Trigger debate from the toggle button
 if (aiDebateToggle) {
   aiDebateToggle.addEventListener('click', () => {
     const idea = messageInput.value.trim();
@@ -1936,18 +1987,12 @@ if (aiDebateToggle) {
       messageInput.focus();
       return;
     }
+    
+    // Clear input and send it
+    messageInput.value = '';
+    autoResizeTextarea(messageInput);
+    updateSendBtnState();
+    
     startDebate(idea);
-  });
-}
-
-// Close debate modal
-if (debateClose) {
-  debateClose.addEventListener('click', () => {
-    debateOverlay.style.display = 'none';
-  });
-}
-if (debateOverlay) {
-  debateOverlay.addEventListener('click', (e) => {
-    if (e.target === debateOverlay) debateOverlay.style.display = 'none';
   });
 }
