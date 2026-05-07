@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Samba AI Premium — Choose Your Plan</title>
+  <style>
+    :root {
+      --primary: #8B5CF6;
+      --primary-hover: #7C3AED;
+      --bg-dark: #0A0A0A;
+      --card-bg: #111111;
+      --text-main: #F4F4F5;
+      --text-muted: #A1A1AA;
+      --border: rgba(255, 255, 255, 0.08);
+      --success: #22C55E;
+    }
+
+    body.light-theme {
+      --bg-dark: #F9FAFB;
+      --card-bg: #FFFFFF;
+      --text-main: #18181B;
+      --text-muted: #71717A;
+      --border: rgba(0, 0, 0, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 40px 20px;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 60px;
+      max-width: 600px;
+    }
+
+    .header h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, var(--text-main) 0%, #8B5CF6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+
+    .pricing-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 32px;
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    .pricing-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-8px);
+      border-color: rgba(139, 92, 246, 0.4);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    body:not(.light-theme) .pricing-card:hover {
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .pricing-card.featured {
+      border: 2px solid var(--primary);
+    }
+
+    body:not(.light-theme) .pricing-card.featured {
+      box-shadow: 0 0 40px rgba(139, 92, 246, 0.15);
+    }
+
+    .badge {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: var(--primary);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .plan-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .plan-price {
+      font-size: 2.5rem;
+      font-weight: 800;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .plan-price span {
+      font-size: 1rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 40px 0;
+      flex-grow: 1;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+      color: var(--text-main);
+    }
+
+    .feature-item svg {
+      width: 20px;
+      height: 20px;
+      color: var(--success);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .feature-item.highlight {
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .pay-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 12px;
+      border: none;
+      background: var(--primary);
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.1s active;
+    }
+
+    .pay-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    .pay-btn:active {
+      transform: scale(0.98);
+    }
+
+    .back-home {
+      margin-top: 60px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: color 0.2s;
+    }
+
+    .back-home:hover {
+      color: var(--text-main);
+    }
+
+    /* Custom Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      background: #18181B;
+      color: #F4F4F5;
+      padding: 16px 24px;
+      border-radius: 12px;
+      border: 1px solid rgba(139, 92, 246, 0.4);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: slideUp 0.3s forwards, fadeOut 0.3s forwards 3.5s;
+    }
+    body.light-theme .toast {
+      background: #FFFFFF;
+      color: #18181B;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+    @keyframes slideUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateY(-10px); }
+    }
+
+    @media (max-width: 640px) {
+      .header h1 { font-size: 2.2rem; }
+      .toast { font-size: 0.85rem; padding: 12px 16px; }
+    }
+  </style>
+  <script>
+    // Immediate theme application to prevent flash
+    (function() {
+      const settings = JSON.parse(localStorage.getItem('smartai_settings') || '{}');
+      if (settings.theme === 'light') {
+        document.documentElement.classList.add('light-theme'); // Use documentElement for earlier effect if needed
+        // But body is more common for existing styles
+      }
+    })();
+  </script>
+</head>
+<body class="dark">
+  <script>
+    // Ensure body gets the class too
+    const settings = JSON.parse(localStorage.getItem('smartai_settings') || '{}');
+    if (settings.theme === 'light') document.body.classList.add('light-theme');
+  </script>
+
+
+  <div class="header">
+    <h1>Elevate Your Experience</h1>
+    <p>Choose the power that fits your needs. From unrestricted technical research to brutal factual integrity.</p>
+  </div>
+
+  <div class="pricing-container">
+    <!-- Pro Plan -->
+    <div class="pricing-card">
+      <div class="plan-name">Samba Pro</div>
+      <div class="plan-price">₹100<span>/week</span></div>
+      <ul class="feature-list">
+        <li class="feature-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          <div><strong>Unrestricted Mode:</strong> Full access to technical and security queries.</div>
+        </li>
+        <li class="feature-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          <div><strong>Multimodal Vision:</strong> Upload and analyze complex images.</div>
+        </li>
+        <li class="feature-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          <div><strong>All Models:</strong> Switch between Gemini, Groq, and NVIDIA.</div>
+        </li>
+        <li class="feature-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          <div><strong>Priority Speed:</strong> Faster response times during peak hours.</div>
+        </li>
+      </ul>
+      <button class="pay-btn" id="payPro">Get Pro Now</button>
+    </div>
+
+    <!-- Truth Plan -->
+    <div class="pricing-card featured">
+      <div class="badge">Recommended</div>
+      <div class="plan-name">Samba Truth</div>
+      <div class="plan-price">₹150<span>/week</span></div>
+      <ul class="feature-list">
+        <li class="feature-item highlight">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <div><strong>Zero Hallucination:</strong> Strict factual grounding. No guessing.</div>
+        </li>
+        <li class="feature-item highlight">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <div><strong>Anti-Sycophancy:</strong> The AI will NOT pamper you. It will be brutally honest.</div>
+        </li>
+        <li class="feature-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          <div><strong>Includes All Pro Features:</strong> Unrestricted, Vision, and Premium Models.</div>
+        </li>
+        <li class="feature-item">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          <div><strong>Expert Mode:</strong> Tailored for researchers and high-stakes decision making.</div>
+        </li>
+      </ul>
+      <button class="pay-btn" id="payTruth" style="background: linear-gradient(135deg, var(--primary) 0%, #7C3AED 100%);">Unlock The Truth</button>
+    </div>
+  </div>
+
+  <a href="/" class="back-home">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+    Back to Samba AI
+  </a>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Razorpay Payment SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  
+  <script>
+    const user = JSON.parse(localStorage.getItem('smartai_user'));
+
+    function showCustomToast(message) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = `<span>✨</span> <div>${message}</div>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    async function startPayment(plan) {
+      if (!user) {
+        showCustomToast('Please sign in to the main chat app first.');
+        setTimeout(() => window.location.href = '/', 2000);
+        return;
+      }
+      
+      showCustomToast('Subscription features are Coming Soon! We are setting up our premium servers.');
+      // Prevent any further Razorpay logic from running
+      return;
+    }
+
+    document.getElementById('payPro').addEventListener('click', () => startPayment('pro'));
+    document.getElementById('payTruth').addEventListener('click', () => startPayment('truth'));
+  </script>
+</body>
+</html>

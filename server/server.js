@@ -31,12 +31,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://checkout.razorpay.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://pagead2.googlesyndication.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https://*"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://accounts.google.com", "https://checkout.razorpay.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://pagead2.googlesyndication.com", "https://unpkg.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net", "https://cdnjs.cloudflare.com", "https://accounts.google.com"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       connectSrc: ["'self'", "https://*"],
-      frameSrc: ["'self'", "https://accounts.google.com", "https://checkout.razorpay.com"]
+      frameSrc: ["'self'", "https://accounts.google.com", "https://checkout.razorpay.com", "https://googleads.g.doubleclick.net"]
     }
   },
   crossOriginEmbedderPolicy: false,
@@ -78,7 +78,13 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '..', 'data', 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'data', 'uploads'), {
+  setHeaders: (res, path) => {
+    res.setHeader('Content-Security-Policy', "default-src 'none';");
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', 'attachment');
+  }
+}));
 
 // Apply rate limiting to API routes
 app.use('/api/', apiLimiter);

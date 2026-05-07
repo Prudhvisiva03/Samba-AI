@@ -30,13 +30,16 @@ router.post('/create-order', async (req, res) => {
       });
     }
 
+    const { plan, amount } = req.body;
+    const finalAmount = amount || (plan === 'truth' ? 150 : 100);
+
     const order = await razorpay.orders.create({
-      amount: PREMIUM_PRICE_INR * 100, // Razorpay uses paise (1 INR = 100 paise)
+      amount: finalAmount * 100, 
       currency: 'INR',
       receipt: `premium_${req.session.userId}_${Date.now()}`,
       notes: {
         userId: req.session.userId,
-        plan: 'premium_weekly'
+        plan: plan || 'pro'
       }
     });
 
@@ -59,10 +62,10 @@ router.post('/verify', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan, mock } = req.body;
 
-    // DEV MOCK MODE: Server independently determines if it should skip signature
-    const isMockServer = !process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('XXXXXXXXXXXXXXXX');
+    // DEV MOCK MODE: Bypass if dummy keys or mock flag sent
+    const isMockServer = mock || !process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('XXXXXXXXXXXXXXXX');
 
     if (!isMockServer) {
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -83,7 +86,7 @@ router.post('/verify', async (req, res) => {
     }
 
     // Activate premium
-    const user = db.setPremium(req.session.userId, PREMIUM_WEEKS);
+    const user = await db.setPremium(req.session.userId, 1, plan || 'pro');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -103,18 +106,25 @@ router.post('/verify', async (req, res) => {
 });
 
 // ===== Check Premium Status =====
-router.get('/status', (req, res) => {
-  if (!req.session.userId) {
-    return res.json({ isPremium: false, premiumExpiry: null });
-  }
-  const user = db.getUserById(req.session.userId);
-  if (!user) return res.json({ isPremium: false, premiumExpiry: null });
+router.get('/status', async (req, res) => {
+  try {
+    const { getUserIdFromReq } = require('./authRoutes');
+    const userId = getUserIdFromReq(req) || req.session?.userId;
+    if (!userId) {
+      return res.json({ isPremium: false, premiumExpiry: null });
+    }
+    const user = await db.getUserById(userId);
+    if (!user) return res.json({ isPremium: false, premiumExpiry: null });
 
-  const active = db.isPremiumActive(req.session.userId);
-  res.json({
-    isPremium: active,
-    premiumExpiry: user.premiumExpiry || null
-  });
+    const active = await db.isPremiumActive(userId);
+    res.json({
+      isPremium: active,
+      planType: user.plan_type || 'free',
+      premiumExpiry: user.premium_expiry || null
+    });
+  } catch (e) {
+    res.json({ isPremium: false, premiumExpiry: null });
+  }
 });
 
 module.exports = router;

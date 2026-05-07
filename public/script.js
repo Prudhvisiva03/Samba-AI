@@ -3,6 +3,31 @@ let chats = [];
 let currentChatId = null;
 let isMainTyping = false;
 let isMiniTyping = false;
+let isDeepResearchEnabled = false;
+
+// ...
+const expandActionsBtn = document.getElementById('expandActionsBtn');
+const extraActions = document.getElementById('extraActions');
+if (expandActionsBtn && extraActions) {
+  expandActionsBtn.addEventListener('click', () => {
+    expandActionsBtn.classList.toggle('open');
+    extraActions.classList.toggle('show');
+  });
+}
+
+const deepResearchToggle = document.getElementById('deepResearchToggle');
+if (deepResearchToggle) {
+  deepResearchToggle.addEventListener('click', () => {
+    isDeepResearchEnabled = !isDeepResearchEnabled;
+    deepResearchToggle.classList.toggle('active', isDeepResearchEnabled);
+    showToast(isDeepResearchEnabled ? 'Deep Research Enabled 🚀' : 'Standard Mode Enabled');
+    // Auto-close after selection for better UX
+    setTimeout(() => {
+      expandActionsBtn.classList.remove('open');
+      extraActions.classList.remove('show');
+    }, 1500);
+  });
+}
 let currentUser = null;
 let settings = {
   enterToSend: true,
@@ -10,7 +35,8 @@ let settings = {
   customInstructions: '',
   currentModel: 'smart-ai-1',
   theme: 'light',
-  unrestrictedMode: false
+  unrestrictedMode: false,
+  truthMode: false
 };
 
 // ===== DOM Elements =====
@@ -72,6 +98,8 @@ const customInstructionsInput = document.getElementById('customInstructions');
 const exportDataBtn = document.getElementById('exportData');
 const securityModeContainer = document.getElementById('securityModeContainer');
 const unrestrictedModeToggle = document.getElementById('unrestrictedMode');
+const truthModeContainer = document.getElementById('truthModeContainer');
+const truthModeToggle = document.getElementById('truthModeToggle');
 
 // ===== API Calls =====
 const API = {
@@ -100,16 +128,24 @@ const API = {
     const res = await fetch(`/api/chats/${chatId}/messages`);
     return res.json();
   },
-  async sendMessage(chatId, content, model, customInstructions, unrestrictedMode) {
-    const res = await fetch(`/api/chats/${chatId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, model, customInstructions, unrestrictedMode }) });
+  async sendMessage(chatId, content, model, customInstructions, unrestrictedMode, truthMode, deepResearch) {
+    const res = await fetch(`/api/chats/${chatId}/messages`, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ content, model, customInstructions, unrestrictedMode, truthMode, deepResearch }) 
+    });
+    if (res.status === 403) {
+      const data = await res.json();
+      throw new Error(data.message || 'Daily limit reached');
+    }
     return res.json();
   },
   async getMiniMessages(chatId) {
     const res = await fetch(`/api/chats/${chatId}/mini-messages`);
     return res.json();
   },
-  async sendMiniMessage(chatId, content, unrestrictedMode) {
-    const res = await fetch(`/api/chats/${chatId}/mini-messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, unrestrictedMode }) });
+  async sendMiniMessage(chatId, content, unrestrictedMode, truthMode) {
+    const res = await fetch(`/api/chats/${chatId}/mini-messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, unrestrictedMode, truthMode }) });
     return res.json();
   },
   async uploadFiles(files) {
@@ -714,16 +750,7 @@ async function sendMainMessage() {
   const content = messageInput.value.trim();
   if ((!content && attachedFiles.length === 0) || isMainTyping) return;
 
-  // Guest limit logic (3 messages max)
-  if (!currentUser) {
-    let guestMessageCount = parseInt(localStorage.getItem('smartai_guest_count') || '0', 10);
-    if (guestMessageCount >= 3) {
-      showToast("Guest limit reached. Please sign in to continue.");
-      loginModal.classList.add('open');
-      return;
-    }
-    localStorage.setItem('smartai_guest_count', guestMessageCount + 1);
-  }
+  // Guest limit removed as per request - Unlimited access for all users
 
   if (!currentChatId) {
     const chat = await API.createChat();
@@ -770,13 +797,23 @@ async function sendMainMessage() {
   showTypingIndicator();
 
   try {
+    // Check for image generation keywords to show animation
+    let imageLoader = null;
+    if (/draw|create image|generate image|imagine/i.test(fullContent)) {
+      imageLoader = showImageLoadingAnimation();
+    }
+
     const result = await API.sendMessage(
-      currentChatId,
-      fullContent,
-      settings.currentModel,
-      settings.customInstructions,
-      settings.unrestrictedMode
+      currentChatId, 
+      fullContent, 
+      settings.currentModel, 
+      settings.customInstructions, 
+      settings.unrestrictedMode, 
+      settings.truthMode,
+      isDeepResearchEnabled
     );
+    
+    if (imageLoader) imageLoader.remove();
     removeTypingIndicator();
     isMainTyping = false;
 
@@ -1007,7 +1044,7 @@ async function sendMiniMessage() {
   showMiniTyping();
 
   try {
-    const result = await API.sendMiniMessage(currentChatId, content, settings.unrestrictedMode);
+    const result = await API.sendMiniMessage(currentChatId, content, settings.unrestrictedMode, settings.truthMode);
     removeMiniTyping();
     isMiniTyping = false;
 
@@ -1133,6 +1170,12 @@ unrestrictedModeToggle.addEventListener('change', () => {
   saveSettings();
 });
 
+// ===== Truth Mode Toggle =====
+truthModeToggle.addEventListener('change', () => {
+  settings.truthMode = truthModeToggle.checked;
+  saveSettings();
+});
+
 // ===== Custom Instructions =====
 customInstructionsInput.addEventListener('change', () => {
   settings.customInstructions = customInstructionsInput.value;
@@ -1195,6 +1238,7 @@ function loadSettings() {
     applyFontSize();
     enterToSendToggle.checked = settings.enterToSend;
     unrestrictedModeToggle.checked = settings.unrestrictedMode;
+    truthModeToggle.checked = settings.truthMode;
     customInstructionsInput.value = settings.customInstructions;
     // Model
     const modelDisplayNames = {
@@ -1432,22 +1476,37 @@ function updateUserUI() {
     userEmail.textContent = currentUser.email || 'Signed in';
     userAvatar.textContent = displayName.charAt(0).toUpperCase();
     
-    // Unrestricted mode logic
-    if (currentUser.email === 'prudhvisiva03@gmail.com') {
+    // Tiered feature access
+    const isAdmin = currentUser.email === 'prudhvisiva03@gmail.com';
+    const isPro = currentUser.isPremium && (currentUser.planType === 'pro' || currentUser.planType === 'truth');
+    const isTruth = currentUser.isPremium && currentUser.planType === 'truth';
+
+    if (isPro || isAdmin) {
       securityModeContainer.style.display = 'flex';
     } else {
       securityModeContainer.style.display = 'none';
-      settings.unrestrictedMode = false; // Force disabled
+      settings.unrestrictedMode = false;
       unrestrictedModeToggle.checked = false;
-      saveSettings();
     }
+
+    if (isTruth || isAdmin) {
+      truthModeContainer.style.display = 'flex';
+    } else {
+      truthModeContainer.style.display = 'none';
+      settings.truthMode = false;
+      truthModeToggle.checked = false;
+    }
+    saveSettings();
   } else {
     userName.textContent = 'Guest';
     userEmail.textContent = 'Click to sign in';
     userAvatar.textContent = 'G';
     securityModeContainer.style.display = 'none';
+    truthModeContainer.style.display = 'none';
     settings.unrestrictedMode = false;
+    settings.truthMode = false;
     unrestrictedModeToggle.checked = false;
+    truthModeToggle.checked = false;
   }
 
   // Reload chats for this account (critical for user-scoped history)
@@ -1672,13 +1731,25 @@ const upgradeBtnText = document.getElementById('upgradeBtnText');
 function updateUpgradeBtnState(isPremium, expiry) {
   if (isPremium && expiry) {
     const expiryDate = new Date(expiry);
-    const formatted = expiryDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    upgradeBtnText.textContent = `Pro Active · Expires ${formatted}`;
+    const formatted = expiryDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    upgradeBtnText.textContent = `Pro Active — Expires ${formatted}`;
     upgradeBtn.classList.add('pro-active');
   } else {
     upgradeBtnText.textContent = 'Upgrade to Pro';
     upgradeBtn.classList.remove('pro-active');
   }
+}
+
+function handleSubscriptionClick(e) {
+  e.preventDefault();
+  showToast('🚀 Subscription features are Coming Soon! Stay tuned.');
+}
+
+if (upgradeBtn) {
+  upgradeBtn.onclick = handleSubscriptionClick;
+}
+if (premiumPayBtn) {
+  premiumPayBtn.onclick = handleSubscriptionClick;
 }
 
 async function checkPremiumStatus() {
@@ -1688,145 +1759,43 @@ async function checkPremiumStatus() {
     updateUpgradeBtnState(data.isPremium, data.premiumExpiry);
     if (data.isPremium) {
       settings.unrestrictedMode = true;
+      settings.truthMode = true;
       const toggle = document.getElementById('unrestrictedMode');
+      const toggle2 = document.getElementById('truthModeToggle');
       if (toggle) toggle.checked = true;
+      if (toggle2) toggle2.checked = true;
+      
+      // We must also update currentUser in memory so the settings UI displays correctly
+      if (currentUser) {
+         currentUser.isPremium = true;
+         currentUser.planType = data.planType || 'pro';
+      }
+      updateUserUI();
     }
-  } catch (_) {}
+  } catch (e) {}
 }
 
-upgradeBtn.addEventListener('click', async () => {
-  // If not logged in, prompt login first
-  if (!currentUser) {
-    showToast('Please sign in to upgrade to Pro');
-    loginModal.classList.add('open');
-    return;
-  }
-  premiumStatusText.textContent = '';
-  premiumModal.classList.add('active');
-  // Check current status to update modal text
-  try {
-    const res = await fetch('/api/payment/status');
-    const data = await res.json();
-    if (data.isPremium && data.premiumExpiry) {
-      const exp = new Date(data.premiumExpiry).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-      premiumStatusText.textContent = `✅ Your Pro plan is active until ${exp}`;
-      premiumPayBtn.textContent = 'Extend by 1 Week';
-    }
-  } catch (_) {}
-});
-
-premiumClose.addEventListener('click', () => {
-  premiumModal.classList.remove('active');
-});
-
-premiumModal.addEventListener('click', (e) => {
-  if (e.target === premiumModal) premiumModal.classList.remove('active');
-});
-
-premiumPayBtn.addEventListener('click', async () => {
-  if (!currentUser) {
-    showToast('Please sign in to upgrade');
-    return;
-  }
-
-  premiumPayBtn.disabled = true;
-  premiumPayBtn.textContent = 'Creating order...';
-
-  try {
-    // 1. Create Razorpay order
-    const orderRes = await fetch('/api/payment/create-order', { method: 'POST' });
-    const orderData = await orderRes.json();
-
-    if (orderData.error) {
-      premiumStatusText.textContent = '❌ ' + orderData.error;
-      premiumPayBtn.disabled = false;
-      premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
-      return;
-    }
-
-    // DEV MOCK MODE: Bypass actual Razorpay window if using dummy keys
-    if (orderData.mockMode) {
-      premiumStatusText.textContent = 'Verifying mock payment...';
-      const verifyRes = await fetch('/api/payment/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isMock: true })
-      });
-      const verifyData = await verifyRes.json();
-      if (verifyData.success) {
-        premiumStatusText.textContent = '🎉 Pro activated! You now have Unrestricted Mode.';
-        updateUpgradeBtnState(true, verifyData.premiumExpiry);
-        settings.unrestrictedMode = true;
-        const toggle = document.getElementById('unrestrictedMode');
-        if (toggle) toggle.checked = true;
-        showToast('⚡ Pro Plan activated successfully!');
-        setTimeout(() => premiumModal.classList.remove('active'), 2000);
-      }
-      return;
-    }
-
-    // 2. Open Razorpay checkout
-    const options = {
-      key: orderData.keyId,
-      amount: orderData.amount,
-      currency: orderData.currency,
-      name: 'Samba AI',
-      description: 'Pro Plan — 1 Week',
-      order_id: orderData.orderId,
-      handler: async function(response) {
-        // 3. Verify payment on backend
-        premiumStatusText.textContent = 'Verifying payment...';
-        try {
-          const verifyRes = await fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            })
-          });
-          const verifyData = await verifyRes.json();
-          if (verifyData.success) {
-            premiumStatusText.textContent = '🎉 Pro activated! You now have Unrestricted Mode.';
-            updateUpgradeBtnState(true, verifyData.premiumExpiry);
-            settings.unrestrictedMode = true;
-            const toggle = document.getElementById('unrestrictedMode');
-            if (toggle) toggle.checked = true;
-            showToast('⚡ Pro Plan activated successfully!');
-            setTimeout(() => premiumModal.classList.remove('active'), 2000);
-          } else {
-            premiumStatusText.textContent = '❌ Verification failed: ' + (verifyData.error || 'Unknown error');
-          }
-        } catch(e) {
-          premiumStatusText.textContent = '❌ Network error during verification.';
-        }
-      },
-      prefill: {
-        name: currentUser?.name || '',
-        email: currentUser?.email || ''
-      },
-      theme: { color: '#7c3aed' },
-      modal: {
-        ondismiss: function() {
-          premiumPayBtn.disabled = false;
-          premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
-          premiumStatusText.textContent = 'Payment cancelled.';
-        }
-      }
-    };
-
-    const rzp = new Razorpay(options);
-    rzp.open();
-    premiumPayBtn.disabled = false;
-    premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
-
-  } catch(err) {
-    premiumStatusText.textContent = '❌ Failed to connect to payment gateway.';
-    premiumPayBtn.disabled = false;
-    premiumPayBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Pay ₹100 & Activate Pro';
-  }
-});
-
-// Check premium status on load (after user session loads)
+// Check premium status on page load (immediately + after session loads)
+checkPremiumStatus();
 setTimeout(checkPremiumStatus, 1000);
+
+function showImageLoadingAnimation() {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'message-wrapper assistant';
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.innerHTML = `
+    <div class="message-avatar">S</div>
+    <div class="message-content">
+      <div class="image-generating-card">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span>Samba AI is drawing your masterpiece...</span>
+        <div class="shimmer-bar"></div>
+      </div>
+    </div>
+  `;
+  wrapper.appendChild(div);
+  messagesContainer.appendChild(wrapper);
+  scrollToBottom(messagesContainer);
+  return wrapper;
+}

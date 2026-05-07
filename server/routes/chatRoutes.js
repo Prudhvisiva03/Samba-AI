@@ -113,7 +113,7 @@ router.get('/:id/messages', async (req, res) => {
 // Send message and get AI response
 router.post('/:id/messages', async (req, res) => {
   try {
-    const { content, model, customInstructions, unrestrictedMode } = req.body;
+    const { content, model, customInstructions, unrestrictedMode, truthMode, deepResearch } = req.body;
     const chatId = req.params.id;
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -145,21 +145,23 @@ router.post('/:id/messages', async (req, res) => {
       }
     }
 
-    // Unrestricted Mode — only for logged-in users who toggled it on
+    // Unrestricted & Truth Modes — only for logged-in users who toggled it on
     let isUnrestricted = false;
-    if (unrestrictedMode && req.session && req.session.userId) {
+    let isTruthMode = false;
+    if (unrestrictedMode && (req.session?.userId || getUserIdFromReq(req))) {
       isUnrestricted = true;
     }
-    // Also check JWT
-    if (unrestrictedMode && getUserIdFromReq(req)) {
-      isUnrestricted = true;
+    if (truthMode && (req.session?.userId || getUserIdFromReq(req))) {
+      isTruthMode = true;
     }
 
     const history = await db.getMessages(chatId);
     const aiText = await generateMainResponse(cleanContent, history, {
       model: model || 'smart-ai-1',
       customInstructions: customInstructions || '',
-      unrestrictedMode: isUnrestricted
+      unrestrictedMode: isUnrestricted,
+      truthMode: isTruthMode,
+      deepResearch: !!deepResearch
     });
     const aiMsg = await db.addMessage(chatId, 'assistant', aiText);
     const updatedChat = await db.getChatById(chatId);

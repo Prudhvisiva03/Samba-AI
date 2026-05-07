@@ -2524,3 +2524,190 @@ body.font-large .mini-message-content {
   min-height: 18px;
 }
 
+
+/* ===== Deep Research & Image Creating Animations ===== */
+
+@keyframes imagePulse {
+  0% { opacity: 0.5; transform: scale(0.98); filter: blur(2px); }
+  50% { opacity: 1; transform: scale(1); filter: blur(0px); }
+  100% { opacity: 0.5; transform: scale(0.98); filter: blur(2px); }
+}
+
+.image-generating-card {
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 1;
+  background: rgba(17, 24, 39, 0.6);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  border: 2px dashed rgba(139, 92, 246, 0.3);
+  animation: imagePulse 2s infinite ease-in-out;
+  margin-bottom: 12px;
+}
+
+.image-generating-card svg {
+  width: 48px;
+  height: 48px;
+  color: #8B5CF6;
+}
+
+.image-generating-card span {
+  font-size: 0.9rem;
+  color: #9CA3AF;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.shimmer-bar {
+  width: 60%;
+  height: 4px;
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+}
+
+.shimmer-bar::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, #8B5CF6, transparent);
+  animation: shimmer 1.5s infinite linear;
+}
+
+@keyframes shimmer {
+  100% { left: 200%; }
+}
+
+.deep-research-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0 10px;
+  user-select: none;
+  height: 36px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.deep-research-toggle.active {
+  background: #8B5CF6;
+  border-color: #8B5CF6;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.deep-research-toggle svg {
+  color: #8B5CF6;
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.deep-research-toggle span {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8B5CF6;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.deep-research-toggle.active svg,
+.deep-research-toggle.active span {
+  color: white !important;
+}
+
+
+.input-container {
+  display: flex !important;
+  align-items: center !important;
+  padding: 10px 14px !important;
+}
+
+
+/* ===== Expandable Actions CSS ===== */
+.expand-actions-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.expand-actions-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+  transform: rotate(90deg);
+}
+
+.expand-actions-btn.open {
+  transform: rotate(135deg);
+  color: var(--accent);
+}
+
+.extra-actions-container {
+  display: flex;
+  align-items: center;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  pointer-events: none;
+}
+
+.extra-actions-container.show {
+  max-width: 200px;
+  opacity: 1;
+  pointer-events: auto;
+  margin-left: 5px;
+}
+
+
+/* ===== Pop-up Actions CSS ===== */
+.extra-actions-container {
+  position: absolute !important;
+  bottom: 60px !important;
+  left: 50px !important;
+  background: var(--bg-elevated);
+  padding: 8px;
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: none !important;
+  width: auto !important;
+  transform: translateY(10px) scale(0.9);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  z-index: 100;
+}
+
+.extra-actions-container.show {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+  pointer-events: auto !important;
+}
+
+.deep-research-toggle {
+  margin: 0 !important;
+  width: 100%;
+  justify-content: flex-start;
+}
+

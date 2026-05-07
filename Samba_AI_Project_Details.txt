@@ -1,0 +1,50 @@
+================================================================================
+SAMBA AI — YOUR INTELLIGENT CHAT ASSISTANT
+================================================================================
+
+PROJECT OVERVIEW:
+Samba AI is a high-performance, multi-model AI chat assistant designed for 
+speed, accuracy, and advanced reasoning. It integrates the latest AI models 
+from Google, Groq, and NVIDIA to provide a seamless conversational experience.
+
+KEY FEATURES:
+--------------------------------------------------------------------------------
+1. Multi-Model Support: 
+   - Gemini 2.0 Flash (Primary)
+   - LLaMA 3.3 (via Groq for blazing fast text)
+   - Nemotron Ultra 253B (via NVIDIA NIM for complex reasoning)
+
+2. Truth Mode (Zero Hallucination):
+   - A specialized factual reasoning mode (Temperature 0.0) that ensures 
+     responses are grounded in truth. If the AI doesn't know, it says so.
+
+3. Unrestricted Mode (Cybersecurity/Hacking Help):
+   - A mode designed for ethical hacking and educational cybersecurity research,
+     allowing users to explore technical vulnerabilities and defensive tactics.
+
+4. Multimodal Analysis:
+   - Capable of analyzing images, documents (PDF, DOCX), and code files in 
+     real-time.
+
+5. Premium (Tiered) Integration:
+   - Samba Pro (₹100/week): Unrestricted Mode, All AI Models, Vision.
+   - Samba Truth (₹150/week): All Pro features + Strict Anti-Sycophancy Mode.
+   - Tiered feature access with secure Razorpay payment gateway integration.
+   - Gated "Truth Mode" and "Unrestricted Mode" based on subscription level.
+
+6. Secure Authentication & Sessions:
+   - Google OAuth and Email/Password authentication.
+   - Persistent session management with Supabase (PostgreSQL).
+--------------------------------------------------------------------------------
+
+TECHNOLOGY STACK:
+- Frontend: HTML5, Vanilla CSS, JavaScript (Browser Native)
+- Backend: Node.js, Express.js
+- Database: Supabase (PostgreSQL)
+- AI Engines: Google Generative AI, Groq SDK, NVIDIA NIM API
+- Payments: Razorpay SDK
+- Communication: Discord Webhooks for API limit alerts
+
+================================================================================
+SAMBA AI - Built for Intelligence, Speed, and Freedom.
+================================================================================

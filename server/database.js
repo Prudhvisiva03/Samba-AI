@@ -36,6 +36,7 @@ function rowToUser(row) {
     email: row.email,
     password: row.password,
     isPremium: row.is_premium === 1 || row.is_premium === true,
+    planType: row.plan_type || 'free',
     premiumExpiry: row.premium_expiry || null,
     premiumActivatedAt: row.premium_activated_at || null,
     created_at: row.created_at
@@ -58,7 +59,7 @@ async function updateUserName(id, name) {
   return getUserById(id);
 }
 
-async function setPremium(id, weeks = 1) {
+async function setPremium(id, weeks = 1, plan = 'pro') {
   const user = await getUserById(id);
   if (!user) return null;
   const now = new Date();
@@ -68,8 +69,8 @@ async function setPremium(id, weeks = 1) {
   base.setDate(base.getDate() + weeks * 7);
   const activatedAt = user.premiumActivatedAt || now.toISOString();
   await pool.query(
-    `UPDATE users SET is_premium = 1, premium_expiry = $1, premium_activated_at = $2 WHERE id = $3`,
-    [base.toISOString(), activatedAt, id]
+    `UPDATE users SET is_premium = 1, plan_type = $1, premium_expiry = $2, premium_activated_at = $3 WHERE id = $4`,
+    [plan, base.toISOString(), activatedAt, id]
   );
   return getUserById(id);
 }
@@ -202,6 +203,21 @@ async function addMiniMessage(chatId, role, content) {
   return rows[0];
 }
 
+async function getUserDailyMessageCount(userId) {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const { rows } = await pool.query(
+      'SELECT COUNT(*) as count FROM messages m JOIN chats c ON m.chat_id = c.id WHERE c.user_id = $1 AND m.created_at >= $2',
+      [userId, today.toISOString()]
+    );
+    return parseInt(rows[0].count || 0, 10);
+  } catch (err) {
+    console.error('Error getting daily count:', err);
+    return 0;
+  }
+}
+
 // Export pool for session store
 module.exports = {
   pool,
@@ -222,5 +238,6 @@ module.exports = {
   getMessages,
   addMessage,
   getMiniMessages,
-  addMiniMessage
+  addMiniMessage,
+  getUserDailyMessageCount
 };

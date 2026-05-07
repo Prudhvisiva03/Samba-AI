@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   password TEXT NOT NULL,
   is_premium INTEGER DEFAULT 0,
+  plan_type TEXT DEFAULT 'free',
   premium_expiry TEXT,
   premium_activated_at TEXT,
   created_at TEXT NOT NULL

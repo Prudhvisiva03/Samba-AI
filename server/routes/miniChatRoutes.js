@@ -26,7 +26,7 @@ router.get('/:id/mini-messages', async (req, res) => {
 // Send mini message and get AI help response
 router.post('/:id/mini-messages', async (req, res) => {
   try {
-    const { content, unrestrictedMode } = req.body;
+    const { content, unrestrictedMode, truthMode } = req.body;
     const chatId = req.params.id;
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
@@ -42,10 +42,11 @@ router.post('/:id/mini-messages', async (req, res) => {
       db.getMiniMessages(chatId)
     ]);
 
-    // Unrestricted Mode — only for logged-in users
-    const isUnrestricted = !!(unrestrictedMode && getUserIdFromReq(req));
+    // Unrestricted Mode & Truth Mode — only for logged-in users
+    const isUnrestricted = !!(unrestrictedMode && (req.session?.userId || getUserIdFromReq(req)));
+    const isTruthMode = !!(truthMode && (req.session?.userId || getUserIdFromReq(req)));
 
-    const aiText = await generateHelpResponse(cleanContent, miniHistory, mainMessages, isUnrestricted);
+    const aiText = await generateHelpResponse(cleanContent, miniHistory, mainMessages, isUnrestricted, isTruthMode);
     const aiMsg = await db.addMiniMessage(chatId, 'assistant', aiText);
 
     res.json({
