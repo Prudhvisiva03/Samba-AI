@@ -1813,9 +1813,11 @@ const debateProgressLabel = document.getElementById('debateProgressLabel');
 const aiDebateToggle   = document.getElementById('aiDebateToggle');
 
 const DEBATE_AIS = [
-  { key: 'groq',   label: 'Groq (LLaMA 3.3)',    initials: 'GQ', role: 'Pragmatic Engineer' },
-  { key: 'gemini', label: 'Gemini (Google)',       initials: 'GE', role: 'Creative Strategist' },
-  { key: 'nvidia', label: 'NVIDIA Nemotron Ultra', initials: 'NV', role: 'Research Scientist' }
+  { key: 'groq',   label: 'Groq (LLaMA 3.3)',             initials: 'GQ', role: 'Pragmatic Engineer' },
+  { key: 'gemini', label: 'Gemini (Google)',               initials: 'GE', role: 'Creative Strategist' },
+  { key: 'nvidia', label: 'NVIDIA Nemotron Ultra',         initials: 'NV', role: 'Research Scientist' },
+  { key: 'gpt',    label: 'GPT-4o (OpenAI)',               initials: 'GP', role: 'Product Manager' },
+  { key: 'claude', label: 'Claude 3.5 Sonnet (Anthropic)', initials: 'CL', role: "Devil's Advocate" }
 ];
 
 function setDebateProgress(pct, label) {
@@ -1854,10 +1856,12 @@ async function startDebate(idea) {
   try {
     // Fake progress animation steps while waiting
     const steps = [
-      { pct: 20, msg: '🟣 Groq (LLaMA 3.3) is analyzing your idea...' },
-      { pct: 45, msg: '🔵 Gemini is countering Groq\'s arguments...' },
-      { pct: 68, msg: '🟢 NVIDIA Nemotron is adding deep research perspective...' },
-      { pct: 85, msg: '⭐ Synthesizing the final verdict...' }
+      { pct: 15, msg: '🟣 Groq (LLaMA 3.3) is analyzing your idea...' },
+      { pct: 30, msg: '🔵 Gemini is countering Groq\'s arguments...' },
+      { pct: 50, msg: '🟢 NVIDIA Nemotron is adding deep research perspective...' },
+      { pct: 65, msg: '🟩 GPT-4o is evaluating product-market fit...' },
+      { pct: 85, msg: '🟧 Claude 3.5 is playing Devil\'s Advocate...' },
+      { pct: 95, msg: '⭐ Synthesizing the final verdict...' }
     ];
 
     let stepIndex = 0;

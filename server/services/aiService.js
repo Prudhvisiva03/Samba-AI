@@ -35,6 +35,8 @@ let genAI = getNextAIInstance();
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 if (API_KEYS.length > 0) {
   console.log(`[AI] Gemini initialized with ${API_KEYS.length} keys (Rotation enabled)`);
@@ -42,15 +44,12 @@ if (API_KEYS.length > 0) {
   console.warn('[AI] No GEMINI_API_KEY found');
 }
 
-if (GROQ_API_KEY) {
-  console.log('[AI] Groq API initialized (Blazing fast text capability enabled)');
-}
+if (GROQ_API_KEY) console.log('[AI] Groq API initialized (Blazing fast text capability enabled)');
+if (NVIDIA_API_KEY) console.log('[AI] NVIDIA NIM API initialized (Nemotron Ultra model enabled)');
+if (OPENAI_API_KEY) console.log('[AI] OpenAI GPT-4o initialized');
+if (ANTHROPIC_API_KEY) console.log('[AI] Anthropic Claude initialized');
 
-if (NVIDIA_API_KEY) {
-  console.log('[AI] NVIDIA NIM API initialized (Nemotron Ultra model enabled)');
-}
-
-if (API_KEYS.length === 0 && !GROQ_API_KEY && !NVIDIA_API_KEY) {
+if (API_KEYS.length === 0 && !GROQ_API_KEY && !NVIDIA_API_KEY && !OPENAI_API_KEY && !ANTHROPIC_API_KEY) {
   console.warn('[AI] No AI keys found — AI responses will be dummy text');
 }
 
@@ -70,11 +69,14 @@ async function notifyDiscord(message) {
   }
 }
 
-// Model mapping
+// Model mapping — all supported model keys
 const MODELS = {
-  'smart-ai-1': 'gemini-2.0-flash',
-  'smart-ai-2': 'gemini-1.5-pro',
-  'nvidia-nemotron': 'nvidia/llama-3.1-nemotron-ultra-253b-v1'
+  'smart-ai-1':      'gemini-2.0-flash',
+  'smart-ai-2':      'gemini-1.5-pro',
+  'nvidia-nemotron': 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
+  'groq-llama':      'llama-3.3-70b-versatile',
+  'gpt-4o':          'gpt-4o',
+  'claude-sonnet':   'claude-3-5-sonnet-20241022'
 };
 
 const uploadsDir = path.join(__dirname, '..', '..', 'data', 'uploads');
@@ -310,8 +312,89 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     // Check for uploaded images in the message
     const imageFiles = extractImageFiles(userMessage);
 
-    // Model routing is now handled automatically via fallback chain.
-    // We always try Gemini first for everything, then gracefully degrade to Groq and Nvidia NIM.
+    // ===== PRIMARY MODEL ROUTING =====
+    // Route to Groq, GPT-4o, or Claude directly if those models are selected
+
+    // --- Groq LLaMA 3.3 ---
+    if (model === 'groq-llama') {
+      if (!GROQ_API_KEY) return 'Groq API key is not configured. Please add GROQ_API_KEY to your environment.';
+      const groqHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'system', content: systemPrompt }, ...groqHistory, { role: 'user', content: userMessage }],
+          temperature: truthMode ? 0.0 : 0.7,
+          max_tokens: 4096
+        })
+      });
+      const groqData = await groqRes.json();
+      if (groqData.error) throw new Error(groqData.error.message);
+      return groqData.choices[0].message.content;
+    }
+
+    // --- OpenAI GPT-4o ---
+    if (model === 'gpt-4o') {
+      if (!OPENAI_API_KEY) return '⚠️ GPT-4o is not configured yet. Please add your OPENAI_API_KEY to the server .env file.';
+      const gptHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: userMessage }],
+          temperature: truthMode ? 0.0 : 0.7,
+          max_tokens: 4096
+        })
+      });
+      const gptData = await gptRes.json();
+      if (gptData.error) throw new Error(gptData.error.message);
+      return gptData.choices[0].message.content;
+    }
+
+    // --- Anthropic Claude 3.5 Sonnet ---
+    if (model === 'claude-sonnet') {
+      if (!ANTHROPIC_API_KEY) return '⚠️ Claude is not configured yet. Please add your ANTHROPIC_API_KEY to the server .env file.';
+      const claudeHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          system: systemPrompt,
+          messages: [...claudeHistory, { role: 'user', content: userMessage }],
+          temperature: truthMode ? 0.0 : 0.7,
+          max_tokens: 4096
+        })
+      });
+      const claudeData = await claudeRes.json();
+      if (claudeData.error) throw new Error(claudeData.error.message);
+      return claudeData.content[0].text;
+    }
+
+    // --- NVIDIA Nemotron (direct, not via Gemini) ---
+    if (model === 'nvidia-nemotron' && NVIDIA_API_KEY) {
+      const nvidiaHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      const nvidiaRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
+        body: JSON.stringify({
+          model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
+          messages: [{ role: 'system', content: systemPrompt }, ...nvidiaHistory, { role: 'user', content: userMessage }],
+          temperature: truthMode ? 0.0 : 0.7,
+          max_tokens: 4096
+        })
+      });
+      const nvidiaData = await nvidiaRes.json();
+      if (nvidiaData.choices?.[0]?.message?.content) return nvidiaData.choices[0].message.content;
+    }
+
+    // === GEMINI ROUTING (default for smart-ai-1, smart-ai-2) ===
 
     // IF IMAGES EXIST OR GROQ FAILOVER, FALLBACK TO GEMINI
     // Ensure we use a valid Gemini model since Nvidia/Groq names will fail here
@@ -716,16 +799,50 @@ Your task:
     }
   } catch (e) { console.error('[DEBATE] NVIDIA round failed:', e.message); }
 
+  // === ROUND 4: GPT-4o — The Product Manager ===
+  try {
+    if (OPENAI_API_KEY) {
+      console.log('[DEBATE] Round 4: GPT-4o analyzing...');
+      const prompt = debaterPrompt('GPT-4o (OpenAI)', 'You are a sharp product manager. Focus on product-market fit, user adoption, competitive landscape, and go-to-market strategy.', debateResults);
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
+        body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }], temperature: 0.8, max_tokens: 400 })
+      });
+      const data = await res.json();
+      if (data.choices?.[0]?.message?.content) {
+        debateResults.push({ name: 'GPT-4o (OpenAI)', model: 'gpt', role: 'Product Manager', response: data.choices[0].message.content });
+      }
+    }
+  } catch (e) { console.error('[DEBATE] GPT-4o round failed:', e.message); }
+
+  // === ROUND 5: Claude 3.5 Sonnet — The Devil Advocate ===
+  try {
+    if (ANTHROPIC_API_KEY) {
+      console.log('[DEBATE] Round 5: Claude analyzing...');
+      const prompt = debaterPrompt('Claude 3.5 Sonnet (Anthropic)', 'You are the devil advocate. Challenge ALL assumptions. Find the biggest risks, ethical issues, and reasons why this idea could fail. Be brutally honest but constructive.', debateResults);
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-3-5-sonnet-20241022', messages: [{ role: 'user', content: prompt }], temperature: 0.8, max_tokens: 400 })
+      });
+      const data = await res.json();
+      if (data.content?.[0]?.text) {
+        debateResults.push({ name: 'Claude 3.5 Sonnet (Anthropic)', model: 'claude', role: "Devil's Advocate", response: data.content[0].text });
+      }
+    }
+  } catch (e) { console.error('[DEBATE] Claude round failed:', e.message); }
+
   // === FINAL SYNTHESIS: Best available model creates the verdict ===
   let synthesis = '';
   try {
     const allDebate = debateResults.map(d => `**${d.name} (${d.role}):**\n${d.response}`).join('\n\n---\n\n');
-    const synthesisPrompt = `You have watched a debate between multiple AI systems about this project idea: "${projectIdea}"
+    const synthesisPrompt = `You have watched a debate between ${debateResults.length} AI systems about this project idea: "${projectIdea}"
 
 Here are all their perspectives:
 ${allDebate}
 
-Now create the FINAL VERDICT (max 200 words):
+Now create the FINAL VERDICT (max 250 words):
 1. **Overall Verdict**: Is this a STRONG, MODERATE, or WEAK idea and why?
 2. **Top 3 Strengths** (bullet points, agreed upon by multiple AIs)
 3. **Top 3 Risks/Weaknesses** (bullet points)
@@ -734,7 +851,11 @@ Now create the FINAL VERDICT (max 200 words):
 
 Be direct and honest. This is the final synthesis that the user will act upon.`;
 
-    if (GROQ_API_KEY) {
+    if (genAI) {
+      const synModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { temperature: 0.4, maxOutputTokens: 600 } });
+      const result = await synModel.generateContent(synthesisPrompt);
+      synthesis = result.response.text();
+    } else if (GROQ_API_KEY) {
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
@@ -747,13 +868,8 @@ Be direct and honest. This is the final synthesis that the user will act upon.`;
       });
       const data = await res.json();
       synthesis = data.choices?.[0]?.message?.content || '';
-    } else if (genAI) {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash', generationConfig: { temperature: 0.5, maxOutputTokens: 500 } });
-      const result = await model.generateContent(synthesisPrompt);
-      synthesis = result.response.text();
     }
   } catch (e) { console.error('[DEBATE] Synthesis failed:', e.message); }
 
   return { debates: debateResults, synthesis };
 }
-

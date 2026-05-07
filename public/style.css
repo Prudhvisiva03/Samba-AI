@@ -2851,6 +2851,14 @@ body.font-large .mini-message-content {
   background: rgba(34, 197, 94, 0.08);
   border-color: rgba(34, 197, 94, 0.25);
 }
+.debate-card.gpt {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+.debate-card.claude {
+  background: rgba(251, 146, 60, 0.08);
+  border-color: rgba(251, 146, 60, 0.25);
+}
 
 .debate-card-header {
   display: flex;
@@ -2873,6 +2881,8 @@ body.font-large .mini-message-content {
 .groq .debate-ai-avatar { background: linear-gradient(135deg, #7c3aed, #a855f7); color: white; }
 .gemini .debate-ai-avatar { background: linear-gradient(135deg, #2563eb, #3b82f6); color: white; }
 .nvidia .debate-ai-avatar { background: linear-gradient(135deg, #15803d, #22c55e); color: white; }
+.gpt .debate-ai-avatar { background: linear-gradient(135deg, #059669, #10b981); color: white; }
+.claude .debate-ai-avatar { background: linear-gradient(135deg, #c2410c, #fb923c); color: white; }
 
 .debate-ai-name {
   font-weight: 700;
