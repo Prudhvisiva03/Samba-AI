@@ -1,23 +1,34 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Contact Us - Samba AI</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 40px auto; padding: 20px; background: #f9f9f9; }
-    h1, h2 { color: #111; }
-    p { margin-bottom: 16px; }
-    .container { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contact Us - Samba AI</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        h1, h2 { color: #8B5CF6; }
+        a { color: #8B5CF6; text-decoration: none; }
+        .back { margin-bottom: 20px; display: inline-block; font-weight: bold; }
+        .contact-form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        .contact-form input, .contact-form textarea { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        .contact-form button { background: #8B5CF6; color: white; border: none; padding: 12px; border-radius: 5px; font-size: 16px; cursor: pointer; }
+        .contact-form button:hover { background: #7C3AED; }
+    </style>
 </head>
 <body>
-  <div class="container">
+    <a href="/" class="back">← Back to Samba AI</a>
     <h1>Contact Us</h1>
-    <p>We would love to hear from you! If you have any questions, feedback, or payment issues, please reach out to us.</p>
-    <h2>Email Support</h2>
-    <p>You can email our founder and lead developer directly at: <strong>prudhvisiva03@gmail.com</strong></p>
-    <h2>Response Time</h2>
-    <p>We aim to respond to all inquiries within 24-48 hours during regular business days.</p>
-  </div>
+    <p>We'd love to hear from you! If you have any questions, bug reports, or feature requests for Samba AI, please reach out to us using the form below or via email.</p>
+    
+    <h2>Email</h2>
+    <p>You can email the developer directly at: <strong>prudhvisiva03@gmail.com</strong></p>
+    
+    <h2>Get in Touch</h2>
+    <form class="contact-form" action="mailto:prudhvisiva03@gmail.com" method="post" enctype="text/plain">
+        <input type="text" name="Name" placeholder="Your Name" required>
+        <input type="email" name="Email" placeholder="Your Email" required>
+        <textarea name="Message" rows="5" placeholder="How can we help you?" required></textarea>
+        <button type="submit">Send Message</button>
+    </form>
 </body>
 </html>
