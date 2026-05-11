@@ -1750,13 +1750,37 @@ function updateUpgradeBtnState(isPremium, expiry) {
   }
 }
 
+const premiumModal = document.getElementById('premiumModal');
+const premiumClose = document.getElementById('premiumClose');
+
+function openPremiumModal(e) {
+  if (e) e.preventDefault();
+  if (premiumModal) {
+    premiumModal.style.display = 'flex';
+  }
+}
+
+function closePremiumModal() {
+  if (premiumModal) {
+    premiumModal.style.display = 'none';
+  }
+}
+
 function handleSubscriptionClick(e) {
-  e.preventDefault();
-  showToast('🚀 Subscription features are Coming Soon! Stay tuned.');
+  if (e) e.preventDefault();
+  showToast('🚀 Payments are Coming Soon! Stay tuned.');
 }
 
 if (upgradeBtn) {
-  upgradeBtn.onclick = handleSubscriptionClick;
+  upgradeBtn.onclick = openPremiumModal;
+}
+if (premiumClose) {
+  premiumClose.onclick = closePremiumModal;
+}
+if (premiumModal) {
+  premiumModal.addEventListener('click', (e) => {
+    if (e.target === premiumModal) closePremiumModal();
+  });
 }
 if (premiumPayBtn) {
   premiumPayBtn.onclick = handleSubscriptionClick;
