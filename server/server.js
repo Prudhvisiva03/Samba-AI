@@ -14,6 +14,8 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const debateRoutes = require('./routes/debateRoutes');
 const cookieParser = require('cookie-parser');
 const { pool } = require('./database');
+const db = require('./database');
+const { getUserIdFromReq } = require('./routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -101,7 +103,17 @@ app.use('/api/debate', debateRoutes);
 // Admin API
 app.get('/api/admin/stats', async (req, res) => {
   try {
-    const db = require('./database');
+    const userId = getUserIdFromReq(req) || req.session?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const user = await db.getUserById(userId);
+    const adminEmail = process.env.ADMIN_EMAIL || 'prudhvisiva03@gmail.com';
+    if (!user || user.email !== adminEmail) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const [u, c, m] = await Promise.all([
       pool.query('SELECT COUNT(*) as c FROM users'),
       pool.query('SELECT COUNT(*) as c FROM chats'),

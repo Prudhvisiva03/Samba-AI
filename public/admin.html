@@ -23,7 +23,7 @@
         const data = await res.json();
         
         if (res.status === 403) {
-          document.getElementById('content').innerHTML = `<p class="error">Access Denied. You must log in as prudhvisiva03@gmail.com on the main app first.</p>`;
+          document.getElementById('content').innerHTML = `<p class="error">Access denied. Please sign in with the configured admin account in the main app first.</p>`;
           return;
         }
 

@@ -4,7 +4,6 @@ const db = require('../database');
 const { generateMainResponse, generateChatTitle } = require('../services/aiService');
 const { getUserIdFromReq } = require('./authRoutes');
 
-// Helper — get userId from JWT cookie or session
 function getUserId(req) {
   const userId = getUserIdFromReq(req);
   if (userId) return userId;
@@ -12,7 +11,30 @@ function getUserId(req) {
   return req.sessionID || 'guest_unknown';
 }
 
-// Get all chats (user-scoped)
+async function getOwnedChat(req, chatId) {
+  return db.getChatById(chatId, getUserId(req));
+}
+
+async function getModeAccess(req) {
+  const userId = getUserIdFromReq(req) || req.session?.userId;
+  if (!userId) {
+    return { unrestricted: false, truth: false };
+  }
+
+  const user = await db.getUserById(userId);
+  const adminEmail = process.env.ADMIN_EMAIL || 'prudhvisiva03@gmail.com';
+  const isAdmin = !!(user && user.email === adminEmail);
+  if (isAdmin) {
+    return { unrestricted: true, truth: true };
+  }
+
+  const isPremium = await db.isPremiumActive(userId);
+  return {
+    unrestricted: isPremium,
+    truth: isPremium && user?.planType === 'truth'
+  };
+}
+
 router.get('/', async (req, res) => {
   try {
     const chats = await db.getAllChats(getUserId(req));
@@ -23,13 +45,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create new chat (user-scoped)
 router.post('/', async (req, res) => {
   try {
     const title = req.body.title;
-    const cleanTitle = (typeof title === 'string' && title.trim())
-      ? title.trim()
-      : 'New Chat';
+    const cleanTitle = (typeof title === 'string' && title.trim()) ? title.trim() : 'New Chat';
     const chat = await db.createChat(cleanTitle, getUserId(req));
     res.status(201).json(chat);
   } catch (err) {
@@ -38,7 +57,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Bulk delete ALL chats for this user
 router.delete('/', async (req, res) => {
   try {
     const count = await db.clearAllChats(getUserId(req));
@@ -49,7 +67,6 @@ router.delete('/', async (req, res) => {
   }
 });
 
-// Delete a single chat (ownership-checked)
 router.delete('/:id', async (req, res) => {
   try {
     const deleted = await db.deleteChat(req.params.id, getUserId(req));
@@ -63,17 +80,18 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Rename a chat (ownership-checked)
 router.put('/:id', async (req, res) => {
   try {
     const { title } = req.body;
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return res.status(400).json({ error: 'Title is required' });
     }
+
     const chat = await db.updateChatTitle(req.params.id, title.trim(), getUserId(req));
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
+
     res.json(chat);
   } catch (err) {
     console.error('[chatRoutes] PUT error:', err.message);
@@ -81,7 +99,6 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Pin/Unpin a chat
 router.put('/:id/pin', async (req, res) => {
   try {
     const chat = await db.togglePinChat(req.params.id, getUserId(req));
@@ -95,13 +112,13 @@ router.put('/:id/pin', async (req, res) => {
   }
 });
 
-// Get messages for a chat (no ownership check — chat UUID is enough security)
 router.get('/:id/messages', async (req, res) => {
   try {
-    const chat = await db.getChatById(req.params.id);
+    const chat = await getOwnedChat(req, req.params.id);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
+
     const messages = await db.getMessages(req.params.id);
     res.json(messages);
   } catch (err) {
@@ -110,7 +127,6 @@ router.get('/:id/messages', async (req, res) => {
   }
 });
 
-// Send message and get AI response
 router.post('/:id/messages', async (req, res) => {
   try {
     const { content, model, customInstructions, unrestrictedMode, truthMode, deepResearch } = req.body;
@@ -123,8 +139,7 @@ router.post('/:id/messages', async (req, res) => {
       return res.status(400).json({ error: 'Message too long (max 20,000 characters)' });
     }
 
-    // Look up chat WITHOUT ownership check — chat UUID is unguessable
-    const chat = await db.getChatById(chatId);
+    const chat = await getOwnedChat(req, chatId);
     if (!chat) {
       return res.status(404).json({ error: 'Chat not found' });
     }
@@ -132,39 +147,33 @@ router.post('/:id/messages', async (req, res) => {
     const cleanContent = content.trim();
     const userMsg = await db.addMessage(chatId, 'user', cleanContent);
 
-    // Auto-generate title for new chats
     if (chat.title === 'New Chat') {
       try {
         const title = await Promise.race([
           generateChatTitle(cleanContent),
-          new Promise(resolve => setTimeout(() => resolve(null), 3000))
+          new Promise((resolve) => setTimeout(() => resolve(null), 3000))
         ]);
-        if (title) await db.updateChatTitle(chatId, title);
+
+        if (title) {
+          await db.updateChatTitle(chatId, title, getUserId(req));
+        }
       } catch (err) {
         console.error('[Title Gen Error]', err.message);
       }
     }
 
-    // Unrestricted & Truth Modes — only for logged-in users who toggled it on
-    let isUnrestricted = false;
-    let isTruthMode = false;
-    if (unrestrictedMode && (req.session?.userId || getUserIdFromReq(req))) {
-      isUnrestricted = true;
-    }
-    if (truthMode && (req.session?.userId || getUserIdFromReq(req))) {
-      isTruthMode = true;
-    }
-
+    const modeAccess = await getModeAccess(req);
     const history = await db.getMessages(chatId);
     const aiText = await generateMainResponse(cleanContent, history, {
       model: model || 'smart-ai-1',
       customInstructions: customInstructions || '',
-      unrestrictedMode: isUnrestricted,
-      truthMode: isTruthMode,
+      unrestrictedMode: !!(unrestrictedMode && modeAccess.unrestricted),
+      truthMode: !!(truthMode && modeAccess.truth),
       deepResearch: !!deepResearch
     });
+
     const aiMsg = await db.addMessage(chatId, 'assistant', aiText);
-    const updatedChat = await db.getChatById(chatId);
+    const updatedChat = await db.getChatById(chatId, getUserId(req));
 
     res.json({
       userMessage: userMsg,

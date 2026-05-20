@@ -20,7 +20,7 @@ if (deepResearchToggle) {
   deepResearchToggle.addEventListener('click', () => {
     isDeepResearchEnabled = !isDeepResearchEnabled;
     deepResearchToggle.classList.toggle('active', isDeepResearchEnabled);
-    showToast(isDeepResearchEnabled ? 'Deep Research Enabled 🚀' : 'Standard Mode Enabled');
+    showToast(isDeepResearchEnabled ? 'Deep Research Enabled' : 'Standard Mode Enabled');
     // Auto-close after selection for better UX
     setTimeout(() => {
       expandActionsBtn.classList.remove('open');
@@ -714,7 +714,7 @@ async function regenerateLastResponse() {
     isMainTyping = false;
 
     if (result.error) {
-      appendMessage('assistant', `⚠️ ${result.error}`);
+      appendMessage('assistant', `Warning: ${result.error}`);
       scrollToBottom(chatArea);
       return;
     }
@@ -787,9 +787,9 @@ async function sendMainMessage() {
   if (uploadedFiles.length > 0) {
     const fileRefs = uploadedFiles.map(f => {
       if (f.type && f.type.startsWith('image/')) {
-        return `📎 ![${f.name}](${f.url})`;
+        return `[Image: ${f.name}](${f.url})`;
       }
-      return `📎 [${f.name}](${f.url}) (${formatFileSize(f.size)})`;
+      return `[Attachment: ${f.name}](${f.url}) (${formatFileSize(f.size)})`;
     }).join('\n');
     fullContent = content ? `${fileRefs}\n\n${content}` : fileRefs;
   }
@@ -828,7 +828,7 @@ async function sendMainMessage() {
     isMainTyping = false;
 
     if (result.error) {
-      appendMessage('assistant', `⚠️ ${result.error}`);
+      appendMessage('assistant', `Warning: ${result.error}`);
       return;
     }
 
@@ -1059,7 +1059,7 @@ async function sendMiniMessage() {
     isMiniTyping = false;
 
     if (result.error) {
-      appendMiniMessage('assistant', `⚠️ ${result.error}`);
+      appendMiniMessage('assistant', `Warning: ${result.error}`);
       scrollToBottom(miniChatMessages);
       return;
     }
@@ -1326,14 +1326,7 @@ userPanelSignout.addEventListener('click', async () => {
   localStorage.removeItem('smartai_user');
   updateUserUI();
   currentChatId = null;
-  chatTitleEl.textContent = 'Samba AI 1.0';
-  messagesEl.innerHTML = `
-    <div class="welcome-screen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-      </svg>
-      <h1>How can I help you today?</h1>
-    </div>`;
+  showWelcome();
   showToast('Signed out');
 });
 
@@ -1664,7 +1657,7 @@ init();
 // ===== Auto-Hint via Text Selection =====
 const selectionBtn = document.createElement('button');
 selectionBtn.className = 'selection-hint-btn';
-selectionBtn.innerHTML = `💡 Explain this`;
+selectionBtn.innerHTML = `Hint: Explain this`;
 document.body.appendChild(selectionBtn);
 
 let currentSelectedText = '';
@@ -1742,16 +1735,13 @@ function updateUpgradeBtnState(isPremium, expiry) {
   if (isPremium && expiry) {
     const expiryDate = new Date(expiry);
     const formatted = expiryDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    upgradeBtnText.textContent = `Pro Active — Expires ${formatted}`;
+    upgradeBtnText.textContent = `Pro Active - Expires ${formatted}`;
     upgradeBtn.classList.add('pro-active');
   } else {
     upgradeBtnText.textContent = 'Upgrade to Pro';
     upgradeBtn.classList.remove('pro-active');
   }
 }
-
-const premiumModal = document.getElementById('premiumModal');
-const premiumClose = document.getElementById('premiumClose');
 
 function openPremiumModal(e) {
   if (e) e.preventDefault();
@@ -1768,7 +1758,7 @@ function closePremiumModal() {
 
 function handleSubscriptionClick(e) {
   if (e) e.preventDefault();
-  showToast('🚀 Payments are Coming Soon! Stay tuned.');
+  showToast('Payments are coming soon.');
 }
 
 if (upgradeBtn) {
@@ -1793,11 +1783,11 @@ async function checkPremiumStatus() {
     updateUpgradeBtnState(data.isPremium, data.premiumExpiry);
     if (data.isPremium) {
       settings.unrestrictedMode = true;
-      settings.truthMode = true;
+      settings.truthMode = data.planType === 'truth';
       const toggle = document.getElementById('unrestrictedMode');
       const toggle2 = document.getElementById('truthModeToggle');
       if (toggle) toggle.checked = true;
-      if (toggle2) toggle2.checked = true;
+      if (toggle2) toggle2.checked = data.planType === 'truth';
       
       // We must also update currentUser in memory so the settings UI displays correctly
       if (currentUser) {

@@ -3,24 +3,29 @@ const router = express.Router();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const db = require('../database');
+const { getUserIdFromReq } = require('./authRoutes');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || '',
   key_secret: process.env.RAZORPAY_KEY_SECRET || ''
 });
 
-const PREMIUM_PRICE_INR = 100; // ₹100 per week
+const PREMIUM_PRICE_INR = 100;
 const PREMIUM_WEEKS = 1;
+const ALLOW_MOCK_PAYMENTS = process.env.ALLOW_MOCK_PAYMENTS === 'true' && process.env.NODE_ENV !== 'production';
 
-// ===== Create Razorpay Order =====
+function getAuthenticatedUserId(req) {
+  return getUserIdFromReq(req) || req.session?.userId || null;
+}
+
 router.post('/create-order', async (req, res) => {
   try {
-    if (!req.session.userId) {
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
       return res.status(401).json({ error: 'Login required to upgrade to Premium' });
     }
-    
-    // DEV MOCK MODE: Bypass if dummy keys are still in .env
-    if (!process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('XXXXXXXXXXXXXXXX')) {
+
+    if (ALLOW_MOCK_PAYMENTS) {
       return res.json({
         mockMode: true,
         orderId: 'mock_order_' + Date.now(),
@@ -34,11 +39,11 @@ router.post('/create-order', async (req, res) => {
     const finalAmount = amount || (plan === 'truth' ? 150 : 100);
 
     const order = await razorpay.orders.create({
-      amount: finalAmount * 100, 
+      amount: finalAmount * 100,
       currency: 'INR',
-      receipt: `premium_${req.session.userId}_${Date.now()}`,
+      receipt: `premium_${userId}_${Date.now()}`,
       notes: {
-        userId: req.session.userId,
+        userId,
         plan: plan || 'pro'
       }
     });
@@ -55,49 +60,58 @@ router.post('/create-order', async (req, res) => {
   }
 });
 
-// ===== Verify Payment & Activate Premium =====
 router.post('/verify', async (req, res) => {
   try {
-    if (!req.session.userId) {
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan, mock } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
 
-    // DEV MOCK MODE: Bypass if dummy keys or mock flag sent
-    const isMockServer = mock || !process.env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID.includes('XXXXXXXXXXXXXXXX');
-
-    if (!isMockServer) {
-      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-        return res.status(400).json({ error: 'Missing payment details' });
+    if (ALLOW_MOCK_PAYMENTS) {
+      const mockUser = await db.setPremium(userId, PREMIUM_WEEKS, plan || 'pro');
+      if (!mockUser) {
+        return res.status(404).json({ error: 'User not found' });
       }
 
-      // Verify signature
-      const body = razorpay_order_id + '|' + razorpay_payment_id;
-      const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-        .update(body)
-        .digest('hex');
-
-      if (expectedSignature !== razorpay_signature) {
-        console.error('[Payment] Signature mismatch — possible fraud attempt');
-        return res.status(400).json({ error: 'Payment verification failed. Please contact support.' });
-      }
+      return res.json({
+        success: true,
+        message: 'Premium activated in development mode.',
+        premiumExpiry: mockUser.premiumExpiry,
+        isPremium: true,
+        planType: mockUser.planType
+      });
     }
 
-    // Activate premium
-    const user = await db.setPremium(req.session.userId, 1, plan || 'pro');
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: 'Missing payment details' });
+    }
+
+    const body = razorpay_order_id + '|' + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+      console.error('[Payment] Signature mismatch - possible fraud attempt');
+      return res.status(400).json({ error: 'Payment verification failed. Please contact support.' });
+    }
+
+    const user = await db.setPremium(userId, PREMIUM_WEEKS, plan || 'pro');
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log(`[Payment] Premium activated for user ${req.session.userId} until ${user.premiumExpiry}`);
+    console.log(`[Payment] Premium activated for user ${userId} until ${user.premiumExpiry}`);
 
     res.json({
       success: true,
-      message: '🎉 Premium activated! Unrestricted Mode is now available.',
+      message: 'Premium activated successfully.',
       premiumExpiry: user.premiumExpiry,
-      isPremium: true
+      isPremium: true,
+      planType: user.planType
     });
   } catch (err) {
     console.error('[Payment] Verify error:', err.message);
@@ -105,25 +119,26 @@ router.post('/verify', async (req, res) => {
   }
 });
 
-// ===== Check Premium Status =====
 router.get('/status', async (req, res) => {
   try {
-    const { getUserIdFromReq } = require('./authRoutes');
-    const userId = getUserIdFromReq(req) || req.session?.userId;
+    const userId = getAuthenticatedUserId(req);
     if (!userId) {
-      return res.json({ isPremium: false, premiumExpiry: null });
+      return res.json({ isPremium: false, premiumExpiry: null, planType: 'free' });
     }
+
     const user = await db.getUserById(userId);
-    if (!user) return res.json({ isPremium: false, premiumExpiry: null });
+    if (!user) {
+      return res.json({ isPremium: false, premiumExpiry: null, planType: 'free' });
+    }
 
     const active = await db.isPremiumActive(userId);
     res.json({
       isPremium: active,
-      planType: user.plan_type || 'free',
-      premiumExpiry: user.premium_expiry || null
+      planType: user.planType || 'free',
+      premiumExpiry: user.premiumExpiry || null
     });
   } catch (e) {
-    res.json({ isPremium: false, premiumExpiry: null });
+    res.json({ isPremium: false, premiumExpiry: null, planType: 'free' });
   }
 });
 

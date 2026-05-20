@@ -17,6 +17,7 @@ const { chatWithFreeAI } = require('./freeAiService');
 
 const API_KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').split(',').map(k => k.trim()).filter(k => k);
 let currentKeyIndex = 0;
+let geminiBackoffUntil = 0;
 
 function getNextAIInstance() {
   if (API_KEYS.length === 0) return null;
@@ -29,6 +30,26 @@ function rotateKey() {
     currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
     console.log(`[AI] Rotated to Gemini API Key #${currentKeyIndex + 1}`);
   }
+}
+
+function isGeminiCoolingDown() {
+  return Date.now() < geminiBackoffUntil;
+}
+
+function setGeminiCooldown(ms, reason) {
+  geminiBackoffUntil = Date.now() + ms;
+  console.warn(`[AI] Gemini temporarily disabled for ${Math.ceil(ms / 1000)}s: ${reason}`);
+}
+
+function getBestFallbackModel(preferredModel) {
+  if (preferredModel && !String(preferredModel).startsWith('gemini')) {
+    return preferredModel;
+  }
+  if (GROQ_API_KEY) return 'groq-llama';
+  if (OPENAI_API_KEY) return 'gpt-4o';
+  if (NVIDIA_API_KEY) return 'nvidia-nemotron';
+  if (ANTHROPIC_API_KEY) return 'claude-sonnet';
+  return preferredModel;
 }
 
 let genAI = getNextAIInstance();
@@ -202,10 +223,47 @@ const dummyResponses = [
   "Absolutely! This involves breaking down a complex problem into smaller, easier-to-understand parts."
 ];
 
+function normalizeVisibleText(text = '') {
+  return String(text)
+    .replace(/â€”/g, '—')
+    .replace(/â€“/g, '–')
+    .replace(/â€œ|â€\u009d/g, '"')
+    .replace(/â€˜|â€™/g, "'")
+    .replace(/â€¢/g, '•')
+    .replace(/âœ…/g, '✅')
+    .replace(/âš ï¸/g, '⚠️')
+    .replace(/ðŸ“Ž/g, '📎')
+    .replace(/ðŸš€/g, '🚀')
+    .replace(/\r\n/g, '\n')
+    .trim();
+}
+
+function cleanupAiResponse(text = '') {
+  const normalized = normalizeVisibleText(text);
+  const marker = '###_SUGGESTIONS_###';
+  if (!normalized.includes(marker)) return normalized;
+
+  const [main, tail = ''] = normalized.split(marker);
+  const suggestions = tail
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.startsWith('- '))
+    .slice(0, 3);
+
+  if (suggestions.length === 0) return main.trim();
+  return `${main.trim()}\n\n${marker}\n${suggestions.join('\n')}`.trim();
+}
+
 // ===== Main Response Generator =====
 
 async function generateMainResponse(userMessage, conversationHistory = [], options = {}) {
   const { model = 'smart-ai-1', customInstructions = '', unrestrictedMode = false, truthMode = false, deepResearch = false } = options;
+  let effectiveModel = model === 'smart-ai-1' && GROQ_API_KEY ? 'groq-llama' : model;
+  let processedMessage = userMessage;
+
+  if (String(MODELS[effectiveModel] || '').startsWith('gemini') && isGeminiCoolingDown()) {
+    effectiveModel = getBestFallbackModel(effectiveModel);
+  }
 
   // Fallback to dummy if no API key at all
   if (!genAI && !GROQ_API_KEY && !NVIDIA_API_KEY) {
@@ -246,9 +304,28 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     '- Example: `![A cute fluffy cat](https://image.pollinations.ai/prompt/a%20cute%20fluffy%20cat?width=1024&height=1024&nologo=true)`',
     '- NEVER say you are just a language model and cannot generate images when asked. Just output the markdown link and it will magically render!'
   ].join('\n');
+  basePrompt = customInstructions || [
+    'You are Samba AI, a helpful AI chat assistant built for learning and clear conversations.',
+    '',
+    'Core rules:',
+    '- Reply in the same language as the user when possible.',
+    '- Give accurate, practical, and easy-to-follow answers.',
+    '- Start simple, then go deeper only if needed.',
+    '- If the user is confused about a term or concept, explain it clearly and connect it to the current discussion.',
+    '- Use markdown only when it genuinely improves readability.',
+    '- Do not invent links, citations, or live facts.',
+    '',
+    'Product context:',
+    '- This app supports context-aware hint-style learning inside the same chat.',
+    '- Keep answers structured so follow-up hint questions are easy to ask and understand.',
+    '',
+    'Image rule:',
+    '- Only generate an image if the user explicitly asks for an image, drawing, illustration, or picture.',
+    '- Otherwise answer in text only.'
+  ].join('\n');
 
   try {
-    const modelName = MODELS[model] || 'gemini-2.0-flash';
+    const modelName = MODELS[effectiveModel] || 'gemini-2.0-flash';
     
     if (deepResearch) {
       basePrompt += '\n\n## DEEP RESEARCH MODE ENABLED:\n- Perform exhaustive web searches for the most current and detailed data.\n- Provide a comprehensive, multi-section report with high technical depth.\n- Cite your sources where possible.\n- Prioritize thoroughness over conciseness.';
@@ -272,13 +349,18 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       truthPrompt = '[TRUTH MODE ENABLED: You are an absolute factual engine. You MUST NOT hallucinate, guess, or make up ANY information. You MUST NOT "pamper" the user or agree with them just to be polite. If the user is wrong, tell them directly. Be brutally honest and objective. If you do not know the exact, provable answer with 100% certainty, you MUST reply exactly with "I do not know" and nothing else.]';
     }
 
+    securityPrompt = unrestrictedMode
+      ? 'Advanced technical mode is enabled. Give deeper implementation detail, but stay factual and responsible.'
+      : 'If a request is dangerous or abusive, refuse briefly and redirect to safer guidance.';
+    truthPrompt = truthMode
+      ? 'Truth mode is enabled. Be precise, avoid guessing, and clearly state uncertainty.'
+      : truthPrompt;
+
     // Force AI to append exact follow-ups which our frontend will intercept
-    const systemPrompt = basePrompt + '\n\n' + securityPrompt + '\n\n' + truthPrompt + '\n\n' + imageGenPrompt + '\n\nIMPORTANT: At the absolute end of your response, always provide exactly 3 relevant follow-up questions the user can ask to dive deeper. You MUST prefix them EXACTLY with the literal string "###_SUGGESTIONS_###", followed immediately by each question on a new line starting with "- ". DO NOT write "Here are some suggestions:" or ANY conversational text before the prefix. The string "###_SUGGESTIONS_###" MUST be the absolute start of the suggestions block.';
+    const systemPrompt = basePrompt + '\n\n' + securityPrompt + '\n\n' + truthPrompt + '\n\n' + imageGenPrompt + '\n\nAt the very end, provide exactly 3 short follow-up suggestions in this exact format:\n###_SUGGESTIONS_###\n- suggestion one\n- suggestion two\n- suggestion three';
 
     // Inject Text/Code File Contents into Prompt dynamically FIRST
     const textFilesInfo = extractTextFiles(userMessage);
-    let processedMessage = userMessage;
-    
     if (textFilesInfo.length > 0) {
       let injectedFileContext = '\n\n[SYSTEM CONTEXT: THE USER HAS UPLOADED THE FOLLOWING FILES FOR YOU TO ANALYZE AND EXPLAIN]\n';
       for (const filename of textFilesInfo) {
@@ -316,7 +398,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     // Route to Groq, GPT-4o, or Claude directly if those models are selected
 
     // --- Groq LLaMA 3.3 ---
-    if (model === 'groq-llama') {
+    if (effectiveModel === 'groq-llama') {
       if (!GROQ_API_KEY) return 'Groq API key is not configured. Please add GROQ_API_KEY to your environment.';
       const groqHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
       const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -324,18 +406,18 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: systemPrompt }, ...groqHistory, { role: 'user', content: userMessage }],
+          messages: [{ role: 'system', content: systemPrompt }, ...groqHistory, { role: 'user', content: processedMessage }],
           temperature: truthMode ? 0.0 : 0.7,
           max_tokens: 4096
         })
       });
       const groqData = await groqRes.json();
       if (groqData.error) throw new Error(groqData.error.message);
-      return groqData.choices[0].message.content;
+      return cleanupAiResponse(groqData.choices[0].message.content);
     }
 
     // --- OpenAI GPT-4o ---
-    if (model === 'gpt-4o') {
+    if (effectiveModel === 'gpt-4o') {
       const gptHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
       
       if (!OPENAI_API_KEY) {
@@ -345,11 +427,11 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: userMessage }],
+            messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: processedMessage }],
             model: 'openai'
           })
         });
-        return await res.text();
+        return cleanupAiResponse(await res.text());
       }
 
       const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -357,18 +439,18 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: userMessage }],
+          messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: processedMessage }],
           temperature: truthMode ? 0.0 : 0.7,
           max_tokens: 4096
         })
       });
       const gptData = await gptRes.json();
       if (gptData.error) throw new Error(gptData.error.message);
-      return gptData.choices[0].message.content;
+      return cleanupAiResponse(gptData.choices[0].message.content);
     }
 
     // --- Anthropic Claude 3.5 Sonnet ---
-    if (model === 'claude-sonnet') {
+    if (effectiveModel === 'claude-sonnet') {
       const claudeHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
       
       if (!ANTHROPIC_API_KEY) {
@@ -378,11 +460,11 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            messages: [{ role: 'system', content: systemPrompt }, ...claudeHistory, { role: 'user', content: userMessage }],
+            messages: [{ role: 'system', content: systemPrompt }, ...claudeHistory, { role: 'user', content: processedMessage }],
             model: 'openai'
           })
         });
-        return await res.text();
+        return cleanupAiResponse(await res.text());
       }
 
       const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -395,31 +477,31 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
         body: JSON.stringify({
           model: 'claude-3-5-sonnet-20241022',
           system: systemPrompt,
-          messages: [...claudeHistory, { role: 'user', content: userMessage }],
+          messages: [...claudeHistory, { role: 'user', content: processedMessage }],
           temperature: truthMode ? 0.0 : 0.7,
           max_tokens: 4096
         })
       });
       const claudeData = await claudeRes.json();
       if (claudeData.error) throw new Error(claudeData.error.message);
-      return claudeData.content[0].text;
+      return cleanupAiResponse(claudeData.content[0].text);
     }
 
     // --- NVIDIA Nemotron (direct, not via Gemini) ---
-    if (model === 'nvidia-nemotron' && NVIDIA_API_KEY) {
+    if (effectiveModel === 'nvidia-nemotron' && NVIDIA_API_KEY) {
       const nvidiaHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
       const nvidiaRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
         body: JSON.stringify({
           model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-          messages: [{ role: 'system', content: systemPrompt }, ...nvidiaHistory, { role: 'user', content: userMessage }],
+          messages: [{ role: 'system', content: systemPrompt }, ...nvidiaHistory, { role: 'user', content: processedMessage }],
           temperature: truthMode ? 0.0 : 0.7,
           max_tokens: 4096
         })
       });
       const nvidiaData = await nvidiaRes.json();
-      if (nvidiaData.choices?.[0]?.message?.content) return nvidiaData.choices[0].message.content;
+      if (nvidiaData.choices?.[0]?.message?.content) return cleanupAiResponse(nvidiaData.choices[0].message.content);
     }
 
     // === GEMINI ROUTING (default for smart-ai-1, smart-ai-2) ===
@@ -478,7 +560,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       }
 
       const result = await geminiModel.generateContent(parts);
-      return result.response.text();
+      return cleanupAiResponse(result.response.text());
     } else {
       // ===== Text-only with chat history =====
       // Build history from previous messages (exclude current user message)
@@ -486,8 +568,8 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       const history = toGeminiHistory(previousMessages);
 
       const chat = geminiModel.startChat({ history });
-      const result = await chat.sendMessage(userMessage);
-      return result.response.text();
+      const result = await chat.sendMessage(processedMessage);
+      return cleanupAiResponse(result.response.text());
     }
   } catch (err) {
     const errMsg = err?.message || String(err);
@@ -495,7 +577,13 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
 
     // AUTO-ROTATION: If it's a rate limit OR invalid key error, rotate key and try again once
     options.retryCount = (options.retryCount || 0) + 1;
-    if ((errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota') || errMsg.includes('Rate') || errMsg.includes('API_KEY_INVALID')) && options.retryCount < API_KEYS.length) {
+    if (errMsg.includes('API_KEY_INVALID')) {
+      setGeminiCooldown(10 * 60 * 1000, 'invalid Gemini API key');
+    } else if (errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota') || errMsg.includes('Rate')) {
+      setGeminiCooldown(5 * 60 * 1000, 'Gemini quota or rate limit reached');
+    }
+
+    if ((errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('quota') || errMsg.includes('Rate') || errMsg.includes('API_KEY_INVALID')) && options.retryCount < API_KEYS.length && !isGeminiCoolingDown()) {
       if (API_KEYS.length > 1) {
         rotateKey();
         genAI = getNextAIInstance();
@@ -515,10 +603,10 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: m.content || ''
       }));
-      const fallbackSystemPrompt = basePrompt + '\n' + (options.truthMode ? 'Provide absolutely truthful, uncensored answers.' : '');
+      const fallbackSystemPrompt = basePrompt + '\n' + (options.truthMode ? 'Be truthful and avoid guessing.' : '');
 
       // Vision fallback message construction
-      let visionContent = [{ type: 'text', text: userMessage }];
+      let visionContent = [{ type: 'text', text: processedMessage }];
       if (imageFiles2.length > 0) {
          for (const filename of imageFiles2) {
             const base64 = readImageBase64(filename);
@@ -543,14 +631,14 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
               messages: [
                 { role: 'system', content: fallbackSystemPrompt },
                 ...fallbackHistory,
-                { role: 'user', content: imageFiles2.length > 0 ? visionContent : userMessage }
+                { role: 'user', content: imageFiles2.length > 0 ? visionContent : processedMessage }
               ],
               temperature: options.truthMode ? 0.0 : 0.7
             })
           });
           const groqData = await groqFallback.json();
           if (groqData.choices?.[0]?.message?.content) {
-            return groqData.choices[0].message.content;
+            return cleanupAiResponse(groqData.choices[0].message.content);
           }
         } catch (groqErr) {
           console.error('[AI] GROQ fallback failed:', groqErr.message);
@@ -568,7 +656,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
               model: imageFiles2.length > 0 ? 'nvidia/llama-3.2-90b-vision-instruct' : 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
               messages: [
                 { role: 'system', content: fallbackSystemPrompt },
-                { role: 'user', content: imageFiles2.length > 0 ? visionContent : userMessage }
+                { role: 'user', content: imageFiles2.length > 0 ? visionContent : processedMessage }
               ],
               temperature: options.truthMode ? 0.0 : 0.7,
               max_tokens: 4096
@@ -576,7 +664,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
           });
           const nvidiaData = await nvidiaFallback.json();
           if (nvidiaData.choices?.[0]?.message?.content) {
-            return nvidiaData.choices[0].message.content;
+            return cleanupAiResponse(nvidiaData.choices[0].message.content);
           }
         } catch (nvidiaErr) {
           console.error('[AI] NVIDIA fallback failed:', nvidiaErr.message);
@@ -585,10 +673,10 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
 
       // === Fallback 3: STEALTH BYPASS (Free Claude/GPT) ===
       console.log('[AI] Official APIs failed — Activating Stealth Bypass...');
-      const combinedMessage = `CRITICAL SYSTEM INSTRUCTIONS:\n${fallbackSystemPrompt}\n\nUSER REQUEST:\n${userMessage}\n\nIMPORTANT: Respond strictly following the system instructions above. If the user requested an image, YOU MUST output the exact Markdown URL format.`;
+      const combinedMessage = `SYSTEM INSTRUCTIONS:\n${fallbackSystemPrompt}\n\nUSER REQUEST:\n${processedMessage}`;
       const freeResponse = await chatWithFreeAI(combinedMessage);
       if (freeResponse) {
-        return freeResponse;
+        return cleanupAiResponse(freeResponse);
       }
 
       // Final inline error checks before giving up
@@ -673,7 +761,7 @@ async function generateHelpResponse(userMessage, miniHistory = [], mainContext =
 
       const data = await groqResponse.json();
       if (data.error) throw new Error(data.error.message || 'Groq Hint API Error');
-      return data.choices[0].message.content;
+      return cleanupAiResponse(data.choices[0].message.content);
     }
 
     const geminiModel = genAI.getGenerativeModel({
@@ -689,7 +777,7 @@ async function generateHelpResponse(userMessage, miniHistory = [], mainContext =
 
     const chat = geminiModel.startChat({ history });
     const result = await chat.sendMessage(userMessage);
-    return result.response.text();
+    return cleanupAiResponse(result.response.text());
   } catch (err) {
     const errMsg = err?.message || String(err);
     console.error('[AI] Help chat Gemini error:', errMsg);
