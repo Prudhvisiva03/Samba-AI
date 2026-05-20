@@ -20,6 +20,11 @@ const { getUserIdFromReq } = require('./routes/authRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Render/HTTPS proxies need trust proxy so secure guest-session cookies persist.
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Rate limiting — prevent API abuse
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
