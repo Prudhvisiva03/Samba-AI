@@ -14,6 +14,14 @@ const PREMIUM_PRICE_INR = 100;
 const PREMIUM_WEEKS = 1;
 const ALLOW_MOCK_PAYMENTS = process.env.ALLOW_MOCK_PAYMENTS === 'true' && process.env.NODE_ENV !== 'production';
 
+function normalizePlan(plan) {
+  return plan === 'truth' ? 'truth' : 'pro';
+}
+
+function getPlanAmount(plan) {
+  return normalizePlan(plan) === 'truth' ? 150 : PREMIUM_PRICE_INR;
+}
+
 function getAuthenticatedUserId(req) {
   return getUserIdFromReq(req) || req.session?.userId || null;
 }
@@ -35,8 +43,8 @@ router.post('/create-order', async (req, res) => {
       });
     }
 
-    const { plan, amount } = req.body;
-    const finalAmount = amount || (plan === 'truth' ? 150 : 100);
+    const plan = normalizePlan(req.body?.plan);
+    const finalAmount = getPlanAmount(plan);
 
     const order = await razorpay.orders.create({
       amount: finalAmount * 100,
@@ -44,7 +52,7 @@ router.post('/create-order', async (req, res) => {
       receipt: `premium_${userId}_${Date.now()}`,
       notes: {
         userId,
-        plan: plan || 'pro'
+        plan
       }
     });
 
@@ -67,10 +75,11 @@ router.post('/verify', async (req, res) => {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } = req.body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const plan = normalizePlan(req.body?.plan);
 
     if (ALLOW_MOCK_PAYMENTS) {
-      const mockUser = await db.setPremium(userId, PREMIUM_WEEKS, plan || 'pro');
+      const mockUser = await db.setPremium(userId, PREMIUM_WEEKS, plan);
       if (!mockUser) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -99,7 +108,7 @@ router.post('/verify', async (req, res) => {
       return res.status(400).json({ error: 'Payment verification failed. Please contact support.' });
     }
 
-    const user = await db.setPremium(userId, PREMIUM_WEEKS, plan || 'pro');
+    const user = await db.setPremium(userId, PREMIUM_WEEKS, plan);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

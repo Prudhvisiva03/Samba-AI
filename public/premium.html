@@ -3,350 +3,653 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Samba AI Premium - Choose Your Plan</title>
+  <title>Samba AI Plans</title>
+  <meta name="description" content="Choose between Direct AI and Truth AI plans for Samba AI.">
   <style>
     :root {
-      --primary: #8B5CF6;
-      --primary-hover: #7C3AED;
-      --bg-dark: #0A0A0A;
-      --card-bg: #111111;
-      --text-main: #F4F4F5;
-      --text-muted: #A1A1AA;
-      --border: rgba(255, 255, 255, 0.08);
-      --success: #22C55E;
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-soft: #eef3ff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: rgba(15, 23, 42, 0.08);
+      --shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+      --primary: #4f46e5;
+      --primary-2: #7c3aed;
+      --success: #15803d;
+      --truth: #0f9d58;
+      --danger: #b91c1c;
     }
 
-    body.light-theme {
-      --bg-dark: #F9FAFB;
-      --card-bg: #FFFFFF;
-      --text-main: #18181B;
-      --text-muted: #71717A;
-      --border: rgba(0, 0, 0, 0.08);
+    * {
+      box-sizing: border-box;
     }
 
-    * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       min-height: 100vh;
-      padding: 40px 20px;
-      transition: background-color 0.3s ease, color 0.3s ease;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(124, 58, 237, 0.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(79, 70, 229, 0.12), transparent 28%),
+        linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
     }
 
-    .header {
-      text-align: center;
-      margin-bottom: 60px;
-      max-width: 600px;
+    a {
+      color: inherit;
     }
 
-    .header h1 {
-      font-size: 3rem;
-      font-weight: 800;
-      margin-bottom: 16px;
-      background: linear-gradient(135deg, var(--text-main) 0%, #8B5CF6 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .page {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 56px;
     }
 
-    .header p {
-      color: var(--text-muted);
-      font-size: 1.1rem;
-      line-height: 1.6;
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 28px;
     }
 
-    .pricing-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 32px;
-      max-width: 1000px;
-      width: 100%;
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--muted);
+      font-weight: 600;
     }
 
-    .pricing-card {
-      background: var(--card-bg);
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 40px;
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--muted);
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 22px;
+      align-items: stretch;
+      margin-bottom: 26px;
+    }
+
+    .hero-card,
+    .summary-card,
+    .plan-card {
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: var(--shadow);
+      border-radius: 28px;
+      backdrop-filter: blur(12px);
+    }
+
+    .hero-card {
+      padding: 34px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(79, 70, 229, 0.1);
+      color: var(--primary);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(2.1rem, 5vw, 3.6rem);
+      line-height: 1.02;
+      letter-spacing: -0.04em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1.04rem;
+      line-height: 1.7;
+      max-width: 62ch;
+    }
+
+    .summary-card {
+      padding: 28px;
       display: flex;
       flex-direction: column;
-      transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .summary-card h2 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    .summary-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+    }
+
+    .summary-list li {
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      border-radius: 18px;
+      padding: 14px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .plans {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 22px;
+    }
+
+    .plan-card {
+      padding: 28px;
       position: relative;
       overflow: hidden;
     }
 
-    .pricing-card:hover {
-      transform: translateY(-8px);
-      border-color: rgba(139, 92, 246, 0.4);
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    }
-
-    body:not(.light-theme) .pricing-card:hover {
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-    }
-
-    .pricing-card.featured {
-      border: 2px solid var(--primary);
-    }
-
-    body:not(.light-theme) .pricing-card.featured {
-      box-shadow: 0 0 40px rgba(139, 92, 246, 0.15);
-    }
-
-    .badge {
+    .plan-card.direct::before,
+    .plan-card.truth::before {
+      content: "";
       position: absolute;
-      top: 20px;
-      right: 20px;
-      background: var(--primary);
-      color: white;
-      padding: 6px 12px;
-      border-radius: 99px;
-      font-size: 0.75rem;
-      font-weight: 600;
+      inset: 0;
+      opacity: 0.12;
+      pointer-events: none;
+    }
+
+    .plan-card.direct::before {
+      background: linear-gradient(140deg, #4f46e5, transparent 55%);
+    }
+
+    .plan-card.truth::before {
+      background: linear-gradient(140deg, #0f9d58, transparent 55%);
+    }
+
+    .plan-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 800;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.08em;
+      margin-bottom: 18px;
+    }
+
+    .plan-card.direct .plan-tag {
+      background: rgba(79, 70, 229, 0.1);
+      color: var(--primary);
+    }
+
+    .plan-card.truth .plan-tag {
+      background: rgba(15, 157, 88, 0.1);
+      color: var(--truth);
     }
 
     .plan-name {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 8px;
+      margin: 0 0 8px;
+      font-size: 1.85rem;
+      line-height: 1.1;
+    }
+
+    .plan-subtitle {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.65;
+      min-height: 78px;
     }
 
     .plan-price {
-      font-size: 2.5rem;
-      font-weight: 800;
-      margin-bottom: 24px;
       display: flex;
       align-items: baseline;
-      gap: 4px;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+
+    .plan-price strong {
+      font-size: 3rem;
+      line-height: 1;
+      letter-spacing: -0.04em;
     }
 
     .plan-price span {
+      color: var(--muted);
       font-size: 1rem;
-      color: var(--text-muted);
-      font-weight: 400;
+      font-weight: 600;
     }
 
     .feature-list {
-      list-style: none;
+      margin: 0 0 24px;
       padding: 0;
-      margin: 0 0 40px 0;
-      flex-grow: 1;
-    }
-
-    .feature-item {
-      display: flex;
-      align-items: flex-start;
+      list-style: none;
+      display: grid;
       gap: 12px;
-      margin-bottom: 16px;
-      font-size: 0.95rem;
-      color: var(--text-main);
     }
 
-    .feature-item svg {
-      width: 20px;
-      height: 20px;
-      color: var(--success);
-      flex-shrink: 0;
-      margin-top: 2px;
+    .feature-list li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 12px;
+      color: var(--text);
+      line-height: 1.55;
+      align-items: start;
     }
 
-    .feature-item.highlight {
+    .feature-list li::before {
+      content: "•";
       color: var(--primary);
-      font-weight: 600;
+      font-size: 20px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+
+    .plan-card.truth .feature-list li::before {
+      color: var(--truth);
+    }
+
+    .plan-note {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .plan-actions {
+      display: grid;
+      gap: 12px;
     }
 
     .pay-btn {
-      width: 100%;
-      padding: 16px;
-      border-radius: 12px;
       border: none;
-      background: var(--primary);
-      color: white;
+      border-radius: 16px;
+      padding: 16px 18px;
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 800;
+      color: #fff;
       cursor: pointer;
-      transition: background 0.2s ease, transform 0.1s active;
+      transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
     }
 
     .pay-btn:hover {
-      background: var(--primary-hover);
+      transform: translateY(-1px);
+      opacity: 0.96;
     }
 
-    .pay-btn:active {
-      transform: scale(0.98);
+    .pay-btn:disabled {
+      cursor: wait;
+      opacity: 0.7;
+      transform: none;
     }
 
-    .back-home {
-      margin-top: 60px;
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 0.9rem;
-      display: flex;
+    .pay-btn.direct {
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      box-shadow: 0 18px 38px rgba(79, 70, 229, 0.22);
+    }
+
+    .pay-btn.truth {
+      background: linear-gradient(135deg, #0f9d58 0%, #15803d 100%);
+      box-shadow: 0 18px 38px rgba(21, 128, 61, 0.22);
+    }
+
+    .secondary-btn {
+      display: inline-flex;
+      justify-content: center;
       align-items: center;
-      gap: 8px;
-      transition: color 0.2s;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 14px 18px;
+      text-decoration: none;
+      font-weight: 700;
     }
 
-    .back-home:hover {
-      color: var(--text-main);
+    .footer-note {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
     }
 
-    .toast-container {
+    .toast-wrap {
       position: fixed;
-      bottom: 24px;
       left: 50%;
+      bottom: 22px;
       transform: translateX(-50%);
       z-index: 1000;
-      display: flex;
-      flex-direction: column;
+      display: grid;
       gap: 10px;
+      width: min(92vw, 520px);
     }
 
     .toast {
-      background: #18181B;
-      color: #F4F4F5;
-      padding: 16px 24px;
-      border-radius: 12px;
-      border: 1px solid rgba(139, 92, 246, 0.4);
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      font-size: 0.95rem;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      opacity: 0;
-      transform: translateY(20px);
-      animation: slideUp 0.3s forwards, fadeOut 0.3s forwards 3.5s;
+      border-radius: 16px;
+      padding: 15px 16px;
+      background: rgba(15, 23, 42, 0.94);
+      color: #fff;
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.3);
+      animation: toast-up 0.2s ease forwards;
     }
 
-    body.light-theme .toast {
-      background: #FFFFFF;
-      color: #18181B;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    .toast.error {
+      background: rgba(185, 28, 28, 0.96);
     }
 
-    @keyframes slideUp {
-      to { opacity: 1; transform: translateY(0); }
+    @keyframes toast-up {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
-    @keyframes fadeOut {
-      to { opacity: 0; transform: translateY(-10px); }
+    @media (max-width: 900px) {
+      .hero,
+      .plans {
+        grid-template-columns: 1fr;
+      }
+
+      .plan-subtitle {
+        min-height: 0;
+      }
     }
 
-    @media (max-width: 640px) {
-      .header h1 { font-size: 2.2rem; }
-      .toast { font-size: 0.85rem; padding: 12px 16px; }
+    @media (max-width: 560px) {
+      .page {
+        width: min(100% - 20px, 1120px);
+        padding-top: 20px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .hero-card,
+      .summary-card,
+      .plan-card {
+        border-radius: 22px;
+      }
+
+      .hero-card,
+      .summary-card,
+      .plan-card {
+        padding: 22px;
+      }
     }
   </style>
-  <script>
-    (function() {
-      const settings = JSON.parse(localStorage.getItem('smartai_settings') || '{}');
-      if (settings.theme === 'light') {
-        document.documentElement.classList.add('light-theme');
-      }
-    })();
-  </script>
 </head>
-<body class="dark">
-  <script>
-    const settings = JSON.parse(localStorage.getItem('smartai_settings') || '{}');
-    if (settings.theme === 'light') document.body.classList.add('light-theme');
-  </script>
-
-  <div class="header">
-    <h1>Elevate Your Experience</h1>
-    <p>Choose the plan that fits your workflow, from advanced technical assistance to stricter factual response modes.</p>
-  </div>
-
-  <div class="pricing-container">
-    <div class="pricing-card">
-      <div class="plan-name">Samba Pro</div>
-      <div class="plan-price">Rs.100<span>/week</span></div>
-      <ul class="feature-list">
-        <li class="feature-item">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          <div><strong>Advanced Technical Mode:</strong> More freedom for deeper technical assistance.</div>
-        </li>
-        <li class="feature-item">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          <div><strong>Multimodal Vision:</strong> Upload and analyze complex images.</div>
-        </li>
-        <li class="feature-item">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          <div><strong>All Models:</strong> Switch between Gemini, Groq, and NVIDIA.</div>
-        </li>
-        <li class="feature-item">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          <div><strong>Priority Speed:</strong> Faster response times during peak hours.</div>
-        </li>
-      </ul>
-      <button class="pay-btn" id="payPro">Get Pro Now</button>
+<body>
+  <div class="page">
+    <div class="topbar">
+      <a href="/" class="back-link">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 18l-6-6 6-6"></path>
+        </svg>
+        Back to Samba AI
+      </a>
+      <div class="status-pill" id="userStatus">Checking your account...</div>
     </div>
 
-    <div class="pricing-card featured">
-      <div class="badge">Recommended</div>
-      <div class="plan-name">Samba Truth</div>
-      <div class="plan-price">Rs.150<span>/week</span></div>
-      <ul class="feature-list">
-        <li class="feature-item highlight">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          <div><strong>Reduced Hallucination:</strong> Stricter factual behavior and less guessing.</div>
-        </li>
-        <li class="feature-item highlight">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style="color: var(--primary)"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          <div><strong>Direct Feedback:</strong> The assistant is more likely to correct mistakes clearly instead of over-agreeing.</div>
-        </li>
-        <li class="feature-item">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          <div><strong>Includes All Pro Features:</strong> Advanced mode, vision, and premium model access.</div>
-        </li>
-        <li class="feature-item">
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-          <div><strong>Research-Oriented:</strong> Better suited for users who want stricter answers and more careful wording.</div>
-        </li>
-      </ul>
-      <button class="pay-btn" id="payTruth" style="background: linear-gradient(135deg, var(--primary) 0%, #7C3AED 100%);">Unlock Truth Mode</button>
-    </div>
+    <section class="hero">
+      <div class="hero-card">
+        <div class="eyebrow">Two clear modes</div>
+        <h1>Choose how honest you want the AI to be.</h1>
+        <p>Samba AI now has two premium paths. <strong>Direct AI</strong> is for users who want blunt, practical, no-nonsense answers. <strong>Truth AI</strong> is for users who want the assistant to stay extra careful, admit uncertainty, and correct mistakes directly instead of trying to please.</p>
+      </div>
+
+      <aside class="summary-card">
+        <h2>Simple difference</h2>
+        <ul class="summary-list">
+          <li><strong>Direct AI:</strong> more direct tone, less pampering, stronger technical explanation, same normal chat flow.</li>
+          <li><strong>Truth AI:</strong> stricter factual behavior, less guessing, stronger uncertainty handling, and clearer correction when something is wrong.</li>
+          <li><strong>Both plans:</strong> premium model access, image/file help, and the same context-based hint support inside one conversation.</li>
+        </ul>
+      </aside>
+    </section>
+
+    <section class="plans">
+      <article class="plan-card direct">
+        <div class="plan-tag">Direct AI</div>
+        <h2 class="plan-name">Samba Direct AI</h2>
+        <p class="plan-subtitle">For users who want a more straightforward assistant that gives practical answers, technical depth, and less sugarcoating.</p>
+        <div class="plan-price">
+          <strong>₹100</strong>
+          <span>/ week</span>
+        </div>
+        <ul class="feature-list">
+          <li>Blunt but respectful answers when you need clarity instead of comfort.</li>
+          <li>Deeper technical explanations for coding, debugging, systems, and study topics.</li>
+          <li>Premium model access, file analysis, image understanding, and hint support.</li>
+          <li>Best for builders who want faster, more practical guidance.</li>
+        </ul>
+        <p class="plan-note">This mode is more direct, not unsafe. Samba AI still blocks harmful or abusive requests.</p>
+        <div class="plan-actions">
+          <button class="pay-btn direct" id="payPro">Activate Direct AI</button>
+          <a class="secondary-btn" href="/">Keep using free mode</a>
+        </div>
+      </article>
+
+      <article class="plan-card truth">
+        <div class="plan-tag">Truth AI</div>
+        <h2 class="plan-name">Samba Truth AI</h2>
+        <p class="plan-subtitle">For users who want stricter factual behavior, less guessing, and a model that says "I do not know" more readily when certainty is low.</p>
+        <div class="plan-price">
+          <strong>₹150</strong>
+          <span>/ week</span>
+        </div>
+        <ul class="feature-list">
+          <li>Extra focus on accuracy, uncertainty, and direct correction when something is wrong.</li>
+          <li>Less flattering behavior and less chance of the AI simply agreeing to keep the tone soft.</li>
+          <li>Includes everything in Direct AI plus the Truth AI toggle inside settings.</li>
+          <li>Great for exams, research, debugging, and serious learning sessions.</li>
+        </ul>
+        <p class="plan-note">Truth AI aims to reduce made-up answers, but no model can guarantee perfection on every topic.</p>
+        <div class="plan-actions">
+          <button class="pay-btn truth" id="payTruth">Activate Truth AI</button>
+          <a class="secondary-btn" href="/">Use free mode for now</a>
+        </div>
+      </article>
+    </section>
+
+    <p class="footer-note">Payments are processed through Razorpay. If you are not signed in, this page will ask you to return to the main app and log in first. After payment, your plan is activated on the same account and the new mode becomes available in Settings.</p>
   </div>
 
-  <a href="/" class="back-home">
-    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-    Back to Samba AI
-  </a>
-
-  <div id="toastContainer" class="toast-container"></div>
+  <div class="toast-wrap" id="toastWrap"></div>
 
   <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script>
-    const user = JSON.parse(localStorage.getItem('smartai_user'));
+    const userStatus = document.getElementById('userStatus');
+    const payProBtn = document.getElementById('payPro');
+    const payTruthBtn = document.getElementById('payTruth');
+    const toastWrap = document.getElementById('toastWrap');
 
-    function showCustomToast(message) {
-      const container = document.getElementById('toastContainer');
+    let currentUser = null;
+    let paymentBusy = false;
+
+    function showToast(message, type = '') {
       const toast = document.createElement('div');
-      toast.className = 'toast';
-      toast.innerHTML = `<span>*</span> <div>${message}</div>`;
-      container.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
+      toast.className = `toast${type ? ' ' + type : ''}`;
+      toast.textContent = message;
+      toastWrap.appendChild(toast);
+      setTimeout(() => toast.remove(), 3600);
     }
 
-    async function startPayment(plan) {
+    function setButtonsBusy(busy) {
+      paymentBusy = busy;
+      [payProBtn, payTruthBtn].forEach((btn) => {
+        btn.disabled = busy;
+      });
+    }
+
+    function updateUserStatus(user) {
       if (!user) {
-        showCustomToast('Please sign in to the main chat app first.');
-        setTimeout(() => window.location.href = '/', 2000);
+        userStatus.textContent = 'Sign in on the main app to activate a plan';
         return;
       }
 
-      showCustomToast('Subscription features are coming soon. Premium checkout is not live yet.');
-      return;
+      if (user.isPremium) {
+        const planName = user.planType === 'truth' ? 'Truth AI active' : 'Direct AI active';
+        userStatus.textContent = `${planName} on ${user.email}`;
+        return;
+      }
+
+      userStatus.textContent = `Signed in as ${user.email}`;
     }
 
-    document.getElementById('payPro').addEventListener('click', () => startPayment('pro'));
-    document.getElementById('payTruth').addEventListener('click', () => startPayment('truth'));
+    async function getSession() {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      currentUser = data.user || null;
+      updateUserStatus(currentUser);
+      return currentUser;
+    }
+
+    async function refreshPremiumStatus() {
+      const res = await fetch('/api/payment/status');
+      const data = await res.json();
+
+      if (currentUser) {
+        currentUser.isPremium = !!data.isPremium;
+        currentUser.planType = data.planType || 'free';
+      }
+
+      updateUserStatus(currentUser);
+      return data;
+    }
+
+    async function createOrder(plan) {
+      const res = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to create order');
+      }
+
+      return data;
+    }
+
+    async function verifyPayment(payload, plan) {
+      const res = await fetch('/api/payment/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, plan })
+      });
+
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Payment verification failed');
+      }
+
+      return data;
+    }
+
+    async function startPayment(plan) {
+      if (paymentBusy) return;
+
+      const user = currentUser || await getSession();
+      if (!user) {
+        showToast('Please sign in from the main Samba AI app first.', 'error');
+        setTimeout(() => { window.location.href = '/'; }, 1400);
+        return;
+      }
+
+      setButtonsBusy(true);
+
+      try {
+        const order = await createOrder(plan);
+
+        if (order.mockMode) {
+          const verified = await verifyPayment({
+            razorpay_order_id: order.orderId,
+            razorpay_payment_id: 'mock_payment',
+            razorpay_signature: 'mock_signature'
+          }, plan);
+
+          showToast(verified.message || 'Plan activated successfully.');
+          await refreshPremiumStatus();
+          setTimeout(() => { window.location.href = '/'; }, 1200);
+          return;
+        }
+
+        if (!window.Razorpay || !order.keyId) {
+          throw new Error('Payment gateway is not configured yet.');
+        }
+
+        const amountLabel = plan === 'truth' ? 'Truth AI' : 'Direct AI';
+        const razorpay = new window.Razorpay({
+          key: order.keyId,
+          amount: order.amount,
+          currency: order.currency || 'INR',
+          name: 'Samba AI',
+          description: `${amountLabel} weekly plan`,
+          order_id: order.orderId,
+          theme: { color: plan === 'truth' ? '#0f9d58' : '#4f46e5' },
+          handler: async function (response) {
+            try {
+              const verified = await verifyPayment(response, plan);
+              showToast(verified.message || 'Plan activated successfully.');
+              await refreshPremiumStatus();
+              setTimeout(() => { window.location.href = '/'; }, 1200);
+            } catch (err) {
+              showToast(err.message || 'Payment verification failed.', 'error');
+            } finally {
+              setButtonsBusy(false);
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setButtonsBusy(false);
+            }
+          },
+          prefill: {
+            name: user.name || '',
+            email: user.email || ''
+          }
+        });
+
+        razorpay.open();
+      } catch (err) {
+        showToast(err.message || 'Payment could not be started.', 'error');
+        setButtonsBusy(false);
+      }
+    }
+
+    payProBtn.addEventListener('click', () => startPayment('pro'));
+    payTruthBtn.addEventListener('click', () => startPayment('truth'));
+
+    getSession().then(refreshPremiumStatus).catch(() => {
+      updateUserStatus(null);
+    });
   </script>
 </body>
 </html>

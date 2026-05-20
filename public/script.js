@@ -1724,63 +1724,43 @@ selectionBtn.addEventListener('mousedown', (e) => {
 });
 
 // ===== Premium / Upgrade System =====
-const premiumModal = document.getElementById('premiumModal');
-const premiumClose = document.getElementById('premiumClose');
-const premiumPayBtn = document.getElementById('premiumPayBtn');
-const premiumStatusText = document.getElementById('premiumStatusText');
 const upgradeBtn = document.getElementById('upgradeBtn');
 const upgradeBtnText = document.getElementById('upgradeBtnText');
 
-function updateUpgradeBtnState(isPremium, expiry) {
+function getPlanLabel(planType) {
+  if (planType === 'truth') return 'Truth AI';
+  if (planType === 'pro') return 'Direct AI';
+  return 'Pro';
+}
+
+function updateUpgradeBtnState(isPremium, expiry, planType = 'free') {
+  if (!upgradeBtn || !upgradeBtnText) return;
+
   if (isPremium && expiry) {
     const expiryDate = new Date(expiry);
     const formatted = expiryDate.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    upgradeBtnText.textContent = `Pro Active - Expires ${formatted}`;
+    upgradeBtnText.textContent = `${getPlanLabel(planType)} Active - Expires ${formatted}`;
     upgradeBtn.classList.add('pro-active');
   } else {
-    upgradeBtnText.textContent = 'Upgrade to Pro';
+    upgradeBtnText.textContent = 'Upgrade Plans';
     upgradeBtn.classList.remove('pro-active');
   }
 }
 
-function openPremiumModal(e) {
+function openPremiumPlans(e) {
   if (e) e.preventDefault();
-  if (premiumModal) {
-    premiumModal.style.display = 'flex';
-  }
-}
-
-function closePremiumModal() {
-  if (premiumModal) {
-    premiumModal.style.display = 'none';
-  }
-}
-
-function handleSubscriptionClick(e) {
-  if (e) e.preventDefault();
-  showToast('Payments are coming soon.');
+  window.location.href = '/premium.html';
 }
 
 if (upgradeBtn) {
-  upgradeBtn.onclick = openPremiumModal;
-}
-if (premiumClose) {
-  premiumClose.onclick = closePremiumModal;
-}
-if (premiumModal) {
-  premiumModal.addEventListener('click', (e) => {
-    if (e.target === premiumModal) closePremiumModal();
-  });
-}
-if (premiumPayBtn) {
-  premiumPayBtn.onclick = handleSubscriptionClick;
+  upgradeBtn.onclick = openPremiumPlans;
 }
 
 async function checkPremiumStatus() {
   try {
     const res = await fetch('/api/payment/status');
     const data = await res.json();
-    updateUpgradeBtnState(data.isPremium, data.premiumExpiry);
+    updateUpgradeBtnState(data.isPremium, data.premiumExpiry, data.planType);
     if (data.isPremium) {
       settings.unrestrictedMode = true;
       settings.truthMode = data.planType === 'truth';
