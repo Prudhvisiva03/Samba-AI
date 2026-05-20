@@ -168,6 +168,19 @@
       overflow: hidden;
     }
 
+    .coming-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.06);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
     .plan-card.direct::before,
     .plan-card.truth::before {
       content: "";
@@ -276,6 +289,17 @@
       line-height: 1.55;
     }
 
+    .plan-highlight {
+      margin: 0 0 18px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--border);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
     .plan-actions {
       display: grid;
       gap: 12px;
@@ -326,6 +350,10 @@
       font-weight: 700;
     }
 
+    .secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.98);
+    }
+
     .footer-note {
       margin-top: 22px;
       color: var(--muted);
@@ -355,6 +383,10 @@
 
     .toast.error {
       background: rgba(185, 28, 28, 0.96);
+    }
+
+    .toast.success {
+      background: rgba(21, 128, 61, 0.95);
     }
 
     @keyframes toast-up {
@@ -421,6 +453,7 @@
         <div class="eyebrow">Two clear modes</div>
         <h1>Choose how honest you want the AI to be.</h1>
         <p>Samba AI now has two premium paths. <strong>Direct AI</strong> is for users who want blunt, practical, no-nonsense answers. <strong>Truth AI</strong> is for users who want the assistant to stay extra careful, admit uncertainty, and correct mistakes directly instead of trying to please.</p>
+        <div class="coming-pill">Launching in phases • Payments are not live yet</div>
       </div>
 
       <aside class="summary-card">
@@ -439,9 +472,10 @@
         <h2 class="plan-name">Samba Direct AI</h2>
         <p class="plan-subtitle">For users who want a more straightforward assistant that gives practical answers, technical depth, and less sugarcoating.</p>
         <div class="plan-price">
-          <strong>₹100</strong>
+          <strong>&#8377;100</strong>
           <span>/ week</span>
         </div>
+        <div class="plan-highlight"><strong>Best for:</strong> people who want the AI to stop over-agreeing, give practical answers faster, and speak more directly.</div>
         <ul class="feature-list">
           <li>Blunt but respectful answers when you need clarity instead of comfort.</li>
           <li>Deeper technical explanations for coding, debugging, systems, and study topics.</li>
@@ -460,9 +494,10 @@
         <h2 class="plan-name">Samba Truth AI</h2>
         <p class="plan-subtitle">For users who want stricter factual behavior, less guessing, and a model that says "I do not know" more readily when certainty is low.</p>
         <div class="plan-price">
-          <strong>₹150</strong>
+          <strong>&#8377;150</strong>
           <span>/ week</span>
         </div>
+        <div class="plan-highlight"><strong>Best for:</strong> research, exams, debugging, and moments where accuracy matters more than a soft or pleasing answer.</div>
         <ul class="feature-list">
           <li>Extra focus on accuracy, uncertainty, and direct correction when something is wrong.</li>
           <li>Less flattering behavior and less chance of the AI simply agreeing to keep the tone soft.</li>
@@ -477,12 +512,11 @@
       </article>
     </section>
 
-    <p class="footer-note">Payments are processed through Razorpay. If you are not signed in, this page will ask you to return to the main app and log in first. After payment, your plan is activated on the same account and the new mode becomes available in Settings.</p>
+    <p class="footer-note">Payments will be enabled after the final rollout. For now, you can explore the plan differences here, then continue using the main chat and hint workflow while the checkout flow is being finished.</p>
   </div>
 
   <div class="toast-wrap" id="toastWrap"></div>
 
-  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <script>
     const userStatus = document.getElementById('userStatus');
     const payProBtn = document.getElementById('payPro');
@@ -490,7 +524,6 @@
     const toastWrap = document.getElementById('toastWrap');
 
     let currentUser = null;
-    let paymentBusy = false;
 
     function showToast(message, type = '') {
       const toast = document.createElement('div');
@@ -500,16 +533,9 @@
       setTimeout(() => toast.remove(), 3600);
     }
 
-    function setButtonsBusy(busy) {
-      paymentBusy = busy;
-      [payProBtn, payTruthBtn].forEach((btn) => {
-        btn.disabled = busy;
-      });
-    }
-
     function updateUserStatus(user) {
       if (!user) {
-        userStatus.textContent = 'Sign in on the main app to activate a plan';
+        userStatus.textContent = 'Sign in on the main app to save your chats and unlock plans later';
         return;
       }
 
@@ -530,124 +556,16 @@
       return currentUser;
     }
 
-    async function refreshPremiumStatus() {
-      const res = await fetch('/api/payment/status');
-      const data = await res.json();
-
-      if (currentUser) {
-        currentUser.isPremium = !!data.isPremium;
-        currentUser.planType = data.planType || 'free';
-      }
-
-      updateUserStatus(currentUser);
-      return data;
+    async function announceComingSoon(plan) {
+      const planLabel = plan === 'truth' ? 'Truth AI' : 'Direct AI';
+      await getSession().catch(() => null);
+      showToast(`${planLabel} checkout is coming soon. We are polishing the final payment flow now.`, 'success');
     }
 
-    async function createOrder(plan) {
-      const res = await fetch('/api/payment/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan })
-      });
+    payProBtn.addEventListener('click', () => announceComingSoon('pro'));
+    payTruthBtn.addEventListener('click', () => announceComingSoon('truth'));
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to create order');
-      }
-
-      return data;
-    }
-
-    async function verifyPayment(payload, plan) {
-      const res = await fetch('/api/payment/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payload, plan })
-      });
-
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Payment verification failed');
-      }
-
-      return data;
-    }
-
-    async function startPayment(plan) {
-      if (paymentBusy) return;
-
-      const user = currentUser || await getSession();
-      if (!user) {
-        showToast('Please sign in from the main Samba AI app first.', 'error');
-        setTimeout(() => { window.location.href = '/'; }, 1400);
-        return;
-      }
-
-      setButtonsBusy(true);
-
-      try {
-        const order = await createOrder(plan);
-
-        if (order.mockMode) {
-          const verified = await verifyPayment({
-            razorpay_order_id: order.orderId,
-            razorpay_payment_id: 'mock_payment',
-            razorpay_signature: 'mock_signature'
-          }, plan);
-
-          showToast(verified.message || 'Plan activated successfully.');
-          await refreshPremiumStatus();
-          setTimeout(() => { window.location.href = '/'; }, 1200);
-          return;
-        }
-
-        if (!window.Razorpay || !order.keyId) {
-          throw new Error('Payment gateway is not configured yet.');
-        }
-
-        const amountLabel = plan === 'truth' ? 'Truth AI' : 'Direct AI';
-        const razorpay = new window.Razorpay({
-          key: order.keyId,
-          amount: order.amount,
-          currency: order.currency || 'INR',
-          name: 'Samba AI',
-          description: `${amountLabel} weekly plan`,
-          order_id: order.orderId,
-          theme: { color: plan === 'truth' ? '#0f9d58' : '#4f46e5' },
-          handler: async function (response) {
-            try {
-              const verified = await verifyPayment(response, plan);
-              showToast(verified.message || 'Plan activated successfully.');
-              await refreshPremiumStatus();
-              setTimeout(() => { window.location.href = '/'; }, 1200);
-            } catch (err) {
-              showToast(err.message || 'Payment verification failed.', 'error');
-            } finally {
-              setButtonsBusy(false);
-            }
-          },
-          modal: {
-            ondismiss: function () {
-              setButtonsBusy(false);
-            }
-          },
-          prefill: {
-            name: user.name || '',
-            email: user.email || ''
-          }
-        });
-
-        razorpay.open();
-      } catch (err) {
-        showToast(err.message || 'Payment could not be started.', 'error');
-        setButtonsBusy(false);
-      }
-    }
-
-    payProBtn.addEventListener('click', () => startPayment('pro'));
-    payTruthBtn.addEventListener('click', () => startPayment('truth'));
-
-    getSession().then(refreshPremiumStatus).catch(() => {
+    getSession().catch(() => {
       updateUserStatus(null);
     });
   </script>
