@@ -254,12 +254,64 @@ function cleanupAiResponse(text = '') {
   return `${main.trim()}\n\n${marker}\n${suggestions.join('\n')}`.trim();
 }
 
+function isGreetingOnly(message = '') {
+  const normalized = String(message)
+    .trim()
+    .toLowerCase()
+    .replace(/[!?.,]/g, '')
+    .replace(/\s+/g, ' ');
+
+  return [
+    'hi',
+    'hello',
+    'hey',
+    'hi ra',
+    'hello ra',
+    'hey ra',
+    'hii',
+    'yo',
+    'namaste',
+    'namasthe',
+    'hai',
+    'hola'
+  ].includes(normalized);
+}
+
+function buildGreetingResponse(message = '') {
+  const normalized = String(message).trim().toLowerCase();
+  const isTeluguStyle = /(\bra\b|namaste|namasthe|hai)/i.test(normalized);
+
+  if (isTeluguStyle) {
+    return [
+      'Hi ra, nenu ikkade unna. Em kavali?',
+      '',
+      '###_SUGGESTIONS_###',
+      '- Oka topic simple ga explain cheppu',
+      '- Naa code lo bug find cheyyi',
+      '- Oka word ki short hint ivvu'
+    ].join('\n');
+  }
+
+  return [
+    'Hi, I am here. What do you want help with?',
+    '',
+    '###_SUGGESTIONS_###',
+    '- Explain a topic simply',
+    '- Help me debug code',
+    '- Give me a quick hint'
+  ].join('\n');
+}
+
 // ===== Main Response Generator =====
 
 async function generateMainResponse(userMessage, conversationHistory = [], options = {}) {
   const { model = 'smart-ai-1', customInstructions = '', unrestrictedMode = false, truthMode = false, deepResearch = false } = options;
   let effectiveModel = model === 'smart-ai-1' && GROQ_API_KEY ? 'groq-llama' : model;
   let processedMessage = userMessage;
+
+  if (conversationHistory.length <= 1 && isGreetingOnly(userMessage)) {
+    return buildGreetingResponse(userMessage);
+  }
 
   if (String(MODELS[effectiveModel] || '').startsWith('gemini') && isGeminiCoolingDown()) {
     effectiveModel = getBestFallbackModel(effectiveModel);
@@ -418,17 +470,11 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       const gptHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
       
       if (!OPENAI_API_KEY) {
-        // STEALTH BYPASS
-        console.log('[AI] Using GPT-4o Stealth Bypass...');
-        const res = await fetch('https://text.pollinations.ai/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: processedMessage }],
-            model: 'openai'
-          })
-        });
-        return cleanupAiResponse(await res.text());
+        const bestFallback = getBestFallbackModel('gpt-4o');
+        if (bestFallback && bestFallback !== 'gpt-4o') {
+          return generateMainResponse(userMessage, conversationHistory, { ...options, model: bestFallback });
+        }
+        throw new Error('OpenAI API key is not configured');
       }
 
       const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -451,17 +497,11 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       const claudeHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
       
       if (!ANTHROPIC_API_KEY) {
-        // STEALTH BYPASS: Pollinations deprecated anonymous Claude, route via their active openai model
-        console.log('[AI] Using Claude Stealth Bypass...');
-        const res = await fetch('https://text.pollinations.ai/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'system', content: systemPrompt }, ...claudeHistory, { role: 'user', content: processedMessage }],
-            model: 'openai'
-          })
-        });
-        return cleanupAiResponse(await res.text());
+        const bestFallback = getBestFallbackModel('claude-sonnet');
+        if (bestFallback && bestFallback !== 'claude-sonnet') {
+          return generateMainResponse(userMessage, conversationHistory, { ...options, model: bestFallback });
+        }
+        throw new Error('Anthropic API key is not configured');
       }
 
       const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -668,12 +708,13 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
         }
       }
 
-      // === Fallback 3: STEALTH BYPASS (Free Claude/GPT) ===
-      console.log('[AI] Official APIs failed — Activating Stealth Bypass...');
+      // === Fallback 3: Free web fallback only when no stable provider is available ===
       const combinedMessage = `SYSTEM INSTRUCTIONS:\n${fallbackSystemPrompt}\n\nUSER REQUEST:\n${processedMessage}`;
-      const freeResponse = await chatWithFreeAI(combinedMessage);
-      if (freeResponse) {
-        return cleanupAiResponse(freeResponse);
+      if (!GROQ_API_KEY && !NVIDIA_API_KEY && !OPENAI_API_KEY && !ANTHROPIC_API_KEY) {
+        const freeResponse = await chatWithFreeAI(combinedMessage);
+        if (freeResponse) {
+          return cleanupAiResponse(freeResponse);
+        }
       }
 
       // Final inline error checks before giving up

@@ -144,6 +144,20 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
+// Pretty page routes so users do not see .html in the URL.
+[
+  ['premium', 'premium.html'],
+  ['privacy', 'privacy.html'],
+  ['terms', 'terms.html'],
+  ['about', 'about.html'],
+  ['contact', 'contact.html'],
+  ['admin', 'admin.html']
+].forEach(([routePath, fileName]) => {
+  app.get(`/${routePath}`, (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'public', fileName));
+  });
+});
+
 // 404 for unknown API routes
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'API endpoint not found' });

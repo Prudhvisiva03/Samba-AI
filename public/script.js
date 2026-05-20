@@ -463,7 +463,9 @@ function createNewChat() {
 }
 
 newChatBtn.addEventListener('click', createNewChat);
-topbarNewChat.addEventListener('click', createNewChat);
+if (topbarNewChat) {
+  topbarNewChat.addEventListener('click', createNewChat);
+}
 
 // ===== Switch Chat =====
 async function switchChat(chatId) {
@@ -1749,7 +1751,7 @@ function updateUpgradeBtnState(isPremium, expiry, planType = 'free') {
 
 function openPremiumPlans(e) {
   if (e) e.preventDefault();
-  window.location.href = '/premium.html';
+  window.location.href = '/premium';
 }
 
 if (upgradeBtn) {

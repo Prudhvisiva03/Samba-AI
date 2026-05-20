@@ -1032,6 +1032,10 @@ textarea {
   gap: 8px;
 }
 
+.topbar-new-chat {
+  display: none !important;
+}
+
 .sidebar-open-btn,
 .topbar-new-chat {
   padding: 8px;

@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Samba AI Plans</title>
   <meta name="description" content="Choose between Direct AI and Truth AI plans for Samba AI.">
+  <script>
+    if (window.location.pathname.endsWith('/premium.html')) {
+      window.location.replace(`/premium${window.location.search}${window.location.hash}`);
+    }
+  </script>
   <style>
     :root {
       --bg: #f4f7fb;
