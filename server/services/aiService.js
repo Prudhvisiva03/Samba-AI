@@ -13,6 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const officeParser = require('officeparser');
+const Tesseract = require('tesseract.js');
 const { chatWithFreeAI } = require('./freeAiService');
 
 const API_KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').split(',').map(k => k.trim()).filter(k => k);
@@ -50,6 +51,14 @@ function getBestFallbackModel(preferredModel) {
   if (NVIDIA_API_KEY) return 'nvidia-nemotron';
   if (ANTHROPIC_API_KEY) return 'claude-sonnet';
   return preferredModel;
+}
+
+function getBestVisionModel(preferredModel) {
+  if (API_KEYS.length > 0) return 'smart-ai-1';
+  if (OPENAI_API_KEY) return 'gpt-4o';
+  if (NVIDIA_API_KEY) return 'nvidia-nemotron';
+  if (GROQ_API_KEY) return 'groq-llama';
+  return preferredModel || 'smart-ai-1';
 }
 
 let genAI = getNextAIInstance();
@@ -101,6 +110,7 @@ const MODELS = {
 };
 
 const uploadsDir = path.join(__dirname, '..', '..', 'data', 'uploads');
+const imageOcrCache = new Map();
 
 // ===== Image Helpers =====
 
@@ -116,6 +126,84 @@ function extractImageFiles(content) {
   return files;
 }
 
+function shouldReusePreviousImages(message = '') {
+  const normalized = String(message).trim().toLowerCase();
+  if (!normalized) return false;
+  return /(this image|that image|above image|uploaded image|from the image|from image|in the image|in this image|in the screenshot|from the screenshot|question\s*5|5th question|fifth question|which answer|which option|photo lo|image lo|screenshot lo)/i.test(normalized);
+}
+
+function extractRecentContextImageFiles(messages = [], limit = 3) {
+  const found = [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    if (!msg || msg.role !== 'user') continue;
+    const files = extractImageFiles(msg.content || '');
+    for (const file of files) {
+      if (!found.includes(file)) {
+        found.push(file);
+      }
+      if (found.length >= limit) {
+        return found.reverse();
+      }
+    }
+  }
+  return found.reverse();
+}
+
+function getRequestedOrdinal(message = '') {
+  const normalized = String(message).toLowerCase();
+  const digitMatch = normalized.match(/\b(\d+)(st|nd|rd|th)?\s+(question|item|answer|option)\b|\b(question|item|answer|option)\s*(number\s*)?(\d+)\b/);
+  if (digitMatch) {
+    return parseInt(digitMatch[1] || digitMatch[6], 10);
+  }
+  const wordMap = {
+    first: 1,
+    second: 2,
+    third: 3,
+    fourth: 4,
+    fifth: 5,
+    sixth: 6,
+    seventh: 7,
+    eighth: 8,
+    ninth: 9,
+    tenth: 10
+  };
+  for (const [word, value] of Object.entries(wordMap)) {
+    if (normalized.includes(`${word} question`) || normalized.includes(`${word} item`) || normalized.includes(`${word} option`) || normalized.includes(`${word} answer`)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function extractOrdinalLine(ocrText = '', ordinal) {
+  if (!ordinal || !ocrText) return '';
+  const lines = String(ocrText)
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const patterns = [
+    new RegExp(`^${ordinal}[.)\\-:\\s]+(.+)$`, 'i'),
+    new RegExp(`^(q|que|question)\\s*${ordinal}[.)\\-:\\s]+(.+)$`, 'i'),
+    new RegExp(`^${ordinal}\\s+(.+)$`, 'i')
+  ];
+
+  for (const line of lines) {
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+      if (match) {
+        return (match[2] || match[1] || '').trim();
+      }
+    }
+  }
+
+  if (ordinal <= lines.length) {
+    return lines[ordinal - 1];
+  }
+  return '';
+}
+
 // Read image file as base64
 function readImageBase64(filename) {
   try {
@@ -126,6 +214,27 @@ function readImageBase64(filename) {
   } catch (err) {
     console.error('[AI] Failed to read image:', err.message);
     return null;
+  }
+}
+
+async function extractImageText(filename) {
+  try {
+    const safeFilename = path.basename(filename);
+    if (imageOcrCache.has(safeFilename)) {
+      return imageOcrCache.get(safeFilename);
+    }
+    const filePath = path.join(uploadsDir, safeFilename);
+    if (!fs.existsSync(filePath)) return '';
+
+    const result = await Tesseract.recognize(filePath, 'eng');
+    const text = normalizeVisibleText(result?.data?.text || '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+    imageOcrCache.set(safeFilename, text);
+    return text;
+  } catch (err) {
+    console.error('[AI] OCR failed:', err.message);
+    return '';
   }
 }
 
@@ -308,6 +417,19 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
   const { model = 'smart-ai-1', customInstructions = '', unrestrictedMode = false, truthMode = false, deepResearch = false } = options;
   let effectiveModel = model === 'smart-ai-1' && GROQ_API_KEY ? 'groq-llama' : model;
   let processedMessage = userMessage;
+  let collectedOcrText = '';
+  let imageFiles = extractImageFiles(userMessage);
+  const contextualImageFiles = imageFiles.length === 0 && shouldReusePreviousImages(userMessage)
+    ? extractRecentContextImageFiles(conversationHistory.slice(0, -1))
+    : [];
+  if (contextualImageFiles.length > 0) {
+    imageFiles = contextualImageFiles;
+  }
+  const hasImages = imageFiles.length > 0;
+
+  if (hasImages) {
+    effectiveModel = getBestVisionModel(model);
+  }
 
   if (conversationHistory.length <= 1 && isGreetingOnly(userMessage)) {
     return buildGreetingResponse(userMessage);
@@ -408,8 +530,12 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       ? 'Truth mode is enabled. Be precise, avoid guessing, and clearly state uncertainty.'
       : truthPrompt;
 
+    const visionPrompt = hasImages
+      ? 'IMAGE UNDERSTANDING MODE: The user attached one or more images. You MUST inspect the image content itself, not just the surrounding text. If the user asks for a specific numbered item such as "5th question", identify that exact item from the image and answer it. If any text in the image is blurry, cropped, or unreadable, say what is unclear instead of guessing.'
+      : '';
+
     // Force AI to append exact follow-ups which our frontend will intercept
-    const systemPrompt = basePrompt + '\n\n' + securityPrompt + '\n\n' + truthPrompt + '\n\n' + imageGenPrompt + '\n\nAt the very end, provide exactly 3 short follow-up suggestions in this exact format:\n###_SUGGESTIONS_###\n- suggestion one\n- suggestion two\n- suggestion three';
+    const systemPrompt = basePrompt + '\n\n' + securityPrompt + '\n\n' + truthPrompt + '\n\n' + visionPrompt + '\n\n' + imageGenPrompt + '\n\nAt the very end, provide exactly 3 short follow-up suggestions in this exact format:\n###_SUGGESTIONS_###\n- suggestion one\n- suggestion two\n- suggestion three';
 
     // Inject Text/Code File Contents into Prompt dynamically FIRST
     const textFilesInfo = extractTextFiles(userMessage);
@@ -443,8 +569,27 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       processedMessage = cleanImageMarkdown(userMessage) + injectedFileContext;
     }
 
-    // Check for uploaded images in the message
-    const imageFiles = extractImageFiles(userMessage);
+    if (hasImages) {
+      let injectedOcrContext = '\n\n[SYSTEM OCR CONTEXT FROM ATTACHED IMAGE]\n';
+      for (const filename of imageFiles.slice(0, 3)) {
+        const ocrText = await extractImageText(filename);
+        if (ocrText) {
+          collectedOcrText += `\n${ocrText}`;
+          injectedOcrContext += `\n--- START OCR (${filename}) ---\n${ocrText.slice(0, 6000)}\n--- END OCR ---\n`;
+        }
+      }
+      if (injectedOcrContext !== '\n\n[SYSTEM OCR CONTEXT FROM ATTACHED IMAGE]\n') {
+        processedMessage = cleanImageMarkdown(processedMessage) + injectedOcrContext;
+      }
+    }
+
+    const requestedOrdinal = getRequestedOrdinal(userMessage);
+    if (hasImages && requestedOrdinal && collectedOcrText.trim()) {
+      const matchedLine = extractOrdinalLine(collectedOcrText, requestedOrdinal);
+      if (matchedLine) {
+        return cleanupAiResponse(`The ${requestedOrdinal}${requestedOrdinal === 1 ? 'st' : requestedOrdinal === 2 ? 'nd' : requestedOrdinal === 3 ? 'rd' : 'th'} item in the image is: ${matchedLine}\n\n###_SUGGESTIONS_###\n- Explain this item in simple words\n- Show all items found in the image\n- Answer another numbered question from this image`);
+      }
+    }
 
     // ===== PRIMARY MODEL ROUTING =====
     // Route to Groq, GPT-4o, or Claude directly if those models are selected
@@ -453,12 +598,27 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     if (effectiveModel === 'groq-llama') {
       if (!GROQ_API_KEY) return 'Groq API key is not configured. Please add GROQ_API_KEY to your environment.';
       const groqHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      let groqContent = processedMessage;
+      let groqModel = 'llama-3.3-70b-versatile';
+      if (hasImages) {
+        groqModel = 'llama-3.2-11b-vision-preview';
+        groqContent = [{ type: 'text', text: processedMessage }];
+        for (const filename of imageFiles) {
+          const base64 = readImageBase64(filename);
+          if (base64) {
+            groqContent.push({
+              type: 'image_url',
+              image_url: { url: `data:${getMimeType(filename)};base64,${base64}` }
+            });
+          }
+        }
+      }
       const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'system', content: systemPrompt }, ...groqHistory, { role: 'user', content: processedMessage }],
+          model: groqModel,
+          messages: [{ role: 'system', content: systemPrompt }, ...groqHistory, { role: 'user', content: groqContent }],
           temperature: truthMode ? 0.0 : 0.7,
           max_tokens: 4096
         })
@@ -480,12 +640,26 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
         throw new Error('OpenAI API key is not configured');
       }
 
+      let gptContent = processedMessage;
+      if (hasImages) {
+        gptContent = [{ type: 'text', text: processedMessage }];
+        for (const filename of imageFiles) {
+          const base64 = readImageBase64(filename);
+          if (base64) {
+            gptContent.push({
+              type: 'image_url',
+              image_url: { url: `data:${getMimeType(filename)};base64,${base64}` }
+            });
+          }
+        }
+      }
+
       const gptRes = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: processedMessage }],
+          messages: [{ role: 'system', content: systemPrompt }, ...gptHistory, { role: 'user', content: gptContent }],
           temperature: truthMode ? 0.0 : 0.7,
           max_tokens: 4096
         })
@@ -496,7 +670,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     }
 
     // --- Anthropic Claude 3.5 Sonnet ---
-    if (effectiveModel === 'claude-sonnet') {
+    if (effectiveModel === 'claude-sonnet' && !hasImages) {
       const claudeHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
       
       if (!ANTHROPIC_API_KEY) {
@@ -530,12 +704,27 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
     // --- NVIDIA Nemotron (direct, not via Gemini) ---
     if (effectiveModel === 'nvidia-nemotron' && NVIDIA_API_KEY) {
       const nvidiaHistory = conversationHistory.slice(0, -1).map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content || '' }));
+      let nvidiaContent = processedMessage;
+      let nvidiaModel = 'nvidia/llama-3.1-nemotron-ultra-253b-v1';
+      if (hasImages) {
+        nvidiaModel = 'nvidia/llama-3.2-90b-vision-instruct';
+        nvidiaContent = [{ type: 'text', text: processedMessage }];
+        for (const filename of imageFiles) {
+          const base64 = readImageBase64(filename);
+          if (base64) {
+            nvidiaContent.push({
+              type: 'image_url',
+              image_url: { url: `data:${getMimeType(filename)};base64,${base64}` }
+            });
+          }
+        }
+      }
       const nvidiaRes = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${NVIDIA_API_KEY}` },
         body: JSON.stringify({
-          model: 'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-          messages: [{ role: 'system', content: systemPrompt }, ...nvidiaHistory, { role: 'user', content: processedMessage }],
+          model: nvidiaModel,
+          messages: [{ role: 'system', content: systemPrompt }, ...nvidiaHistory, { role: 'user', content: nvidiaContent }],
           temperature: truthMode ? 0.0 : 0.7,
           max_tokens: 4096
         })

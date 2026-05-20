@@ -5,10 +5,13 @@ const crypto = require('crypto');
 const db = require('../database');
 const { getUserIdFromReq } = require('./authRoutes');
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || '',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || ''
-});
+const hasRazorpayConfig = Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+const razorpay = hasRazorpayConfig
+  ? new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET
+    })
+  : null;
 
 const PREMIUM_PRICE_INR = 100;
 const PREMIUM_WEEKS = 1;
@@ -45,6 +48,10 @@ router.post('/create-order', async (req, res) => {
 
     const plan = normalizePlan(req.body?.plan);
     const finalAmount = getPlanAmount(plan);
+
+    if (!razorpay) {
+      return res.status(503).json({ error: 'Payments are not configured yet.' });
+    }
 
     const order = await razorpay.orders.create({
       amount: finalAmount * 100,
@@ -95,6 +102,10 @@ router.post('/verify', async (req, res) => {
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: 'Missing payment details' });
+    }
+
+    if (!hasRazorpayConfig) {
+      return res.status(503).json({ error: 'Payments are not configured yet.' });
     }
 
     const body = razorpay_order_id + '|' + razorpay_payment_id;
