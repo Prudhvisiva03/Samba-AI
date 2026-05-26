@@ -544,7 +544,7 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
       : '';
 
     // Image generation strict rule
-    const imageGenPrompt = 'IMAGE GENERATION RULE (STRICT): Only generate an image if the user explicitly uses words like "generate image", "draw", "create image", "imagine", "paint", or "make a picture". For ALL other requests — respond with TEXT ONLY. When generation IS requested: use the exact format `![Image Description](https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true)`. JUST output the markdown link, no extra text.';
+    const imageGenPrompt = 'IMAGE GENERATION RULE (STRICT): Only generate an image if the user explicitly uses words like "generate image", "draw", "create image", "imagine", "paint", "make a picture", "bomma", "veyyi", "చిత్రం", "pic", "photo", "image", "draw cheyyi", "image veyyi", "bomma veyyi". For ALL other requests — respond with TEXT ONLY. When generation IS requested: use the exact format `![Image Description](https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true)`. JUST output the markdown link, no extra text.';
 
     const visionPrompt = hasImages
       ? 'IMAGE UNDERSTANDING MODE: The user attached one or more images. You MUST inspect the image content itself, not just the surrounding text. If the user asks for a specific numbered item such as "5th question", identify that exact item from the image and answer it. If any text in the image is blurry, cropped, or unreadable, say what is unclear instead of guessing.'
@@ -860,8 +860,11 @@ async function generateMainResponse(userMessage, conversationHistory = [], optio
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: m.content || ''
       }));
+      
+      const imageGenPrompt = 'IMAGE GENERATION RULE (STRICT): Only generate an image if the user explicitly uses words like "generate image", "draw", "create image", "imagine", "paint", "make a picture", "bomma", "veyyi", "చిత్రం", "pic", "photo", "image", "draw cheyyi", "image veyyi", "bomma veyyi". For ALL other requests — respond with TEXT ONLY. When generation IS requested: use the exact format `![Image Description](https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true)`. JUST output the markdown link, no extra text.';
+
       // Use the FULL system prompt for fallbacks too — not the stripped version
-      const fallbackSystemPrompt = basePrompt + '\n' + (options.truthMode ? 'Truth mode: Be precise, avoid guessing, clearly state uncertainty.' : '') + '\n\nCRITICAL: Do NOT hallucinate tool names, commands, or facts. If you are not 100% certain about something, say so clearly instead of inventing wrong information. Ollama is a real tool (https://ollama.ai) for running LLMs locally — to install Ollama on Linux/Kali Linux, the official and correct way is: curl -fsSL https://ollama.com/install.sh | sh. Do NOT instruct the user to clone git repositories or use pip for installing Ollama. Treat all well-known tools as real unless you have specific contrary knowledge.';
+      const fallbackSystemPrompt = basePrompt + '\n' + (options.truthMode ? 'Truth mode: Be precise, avoid guessing, clearly state uncertainty.' : '') + '\n\nCRITICAL: Do NOT hallucinate tool names, commands, or facts. If you are not 100% certain about something, say so clearly instead of inventing wrong information. Ollama is a real tool (https://ollama.ai) for running LLMs locally — to install Ollama on Linux/Kali Linux, the official and correct way is: curl -fsSL https://ollama.com/install.sh | sh. Do NOT instruct the user to clone git repositories or use pip for installing Ollama. Treat all well-known tools as real unless you have specific contrary knowledge.\n\n' + imageGenPrompt;
 
       // Vision fallback message construction
       let visionContent = [{ type: 'text', text: processedMessage }];

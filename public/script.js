@@ -820,7 +820,7 @@ async function sendMainMessage() {
   try {
     // Check for image generation keywords to show animation
     let imageLoader = null;
-    if (/draw|create image|generate image|imagine/i.test(fullContent)) {
+    if (/draw|create image|generate image|imagine|paint|bomma|veyyi|pic|photo|image|చిత్రం/i.test(fullContent)) {
       imageLoader = showImageLoadingAnimation();
     }
 
