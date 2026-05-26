@@ -4,12 +4,12 @@
 /* ===== CSS Variables ===== */
 :root {
   /* Deep Premium Dark Mode (Linear/Vercel Inspired) */
-  --bg-primary: #0A0A0A;
-  --bg-secondary: #111111;
-  --bg-sidebar: #111111;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-active: rgba(255, 255, 255, 0.09);
-  --bg-input: #111111;
+  --bg-primary: #000000;
+  --bg-secondary: #0A0A0A;
+  --bg-sidebar: #0A0A0A;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.1);
+  --bg-input: #080808;
   
   /* Text and Lines */
   --text-primary: #F4F4F5;
@@ -2227,31 +2227,45 @@ body.font-large .mini-message-content {
 }
 
 /* Follow-up Suggestion Chips */
+/* Follow-up Suggestion Chips */
 .suggestions-chips-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 14px;
 }
 .suggestion-chip-btn {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text-secondary);
   border: 1px solid var(--border-color);
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
   font-family: 'Inter', sans-serif;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: left;
   line-height: 1.4;
-  max-width: 90%;
+  max-width: 95%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.suggestion-chip-btn::before {
+  content: '✦';
+  color: var(--accent);
+  font-size: 11px;
+  transition: transform 0.25s ease;
 }
 .suggestion-chip-btn:hover {
-  background: var(--bg-active);
+  background: rgba(139, 92, 246, 0.08);
   color: var(--text-primary);
-  border-color: var(--text-muted);
-  transform: translateY(-1px);
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+}
+.suggestion-chip-btn:hover::before {
+  transform: scale(1.2) rotate(15deg);
 }
 
 /* ===== Responsive ===== */

@@ -5,24 +5,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About Us - Samba AI</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
-        h1, h2 { color: #8B5CF6; }
-        a { color: #8B5CF6; text-decoration: none; }
-        .back { margin-bottom: 20px; display: inline-block; font-weight: bold; }
+        :root {
+          --bg: #0A0A0A;
+          --text: #F4F4F5;
+          --muted: #A1A1AA;
+          --accent: #8B5CF6;
+          --border: rgba(255, 255, 255, 0.08);
+          --card: #111111;
+        }
+        body.light-theme {
+          --bg: #F8FAFC;
+          --text: #0F172A;
+          --muted: #475569;
+          --border: rgba(0, 0, 0, 0.08);
+          --card: #FFFFFF;
+        }
+        body {
+          background: var(--bg);
+          color: var(--text);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          line-height: 1.6;
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 40px 20px;
+          transition: background 0.3s, color 0.3s;
+        }
+        h1, h2 { color: var(--accent); font-weight: 700; margin-top: 24px; }
+        a { color: var(--accent); text-decoration: none; font-weight: 600; }
+        a:hover { text-decoration: underline; }
+        .back { margin-bottom: 20px; display: inline-flex; align-items: center; gap: 6px; font-weight: bold; }
+        .card {
+          background: var(--card);
+          border: 1px solid var(--border);
+          padding: 24px;
+          border-radius: 16px;
+          margin-bottom: 20px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
     </style>
 </head>
 <body>
+    <script>
+        (function() {
+          try {
+            const saved = localStorage.getItem('smartai_settings');
+            let theme = 'dark';
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (parsed && parsed.theme) {
+                theme = parsed.theme;
+              }
+            }
+            if (theme === 'light') {
+              document.body.classList.add('light-theme');
+            } else {
+              document.body.classList.remove('light-theme');
+            }
+          } catch(e) {}
+        })();
+    </script>
     <a href="/" class="back">&larr; Back to Samba AI</a>
     <h1>About Us</h1>
-    <p>Welcome to <strong>Samba AI</strong>, a context-aware chat assistant built to help users learn clearly without losing the flow of a conversation.</p>
+    <div class="card">
+        <p>Welcome to <strong>Samba AI</strong>, a context-aware chat assistant built to help users learn clearly without losing the flow of a conversation.</p>
+    </div>
     
     <h2>Our Mission</h2>
-    <p>Our mission is to make AI conversations easier to understand, especially when users get stuck on technical terms, unfamiliar ideas, or confusing explanations. We want people to continue the same main discussion and use short hint-style clarifications whenever they need help.</p>
+    <div class="card">
+        <p>Our mission is to make AI conversations easier to understand, especially when users get stuck on technical terms, unfamiliar ideas, or confusing explanations. We want people to continue the same main discussion and use short hint-style clarifications whenever they need help.</p>
+    </div>
     
     <h2>What We Do</h2>
-    <p>Samba AI combines a main chat experience with context-aware hint support, so users can keep one clean conversation while still asking for quick explanations of difficult words or concepts. The platform also supports code help, file analysis, and multiple AI backends for different kinds of tasks.</p>
+    <div class="card">
+        <p>Samba AI combines a main chat experience with context-aware hint support, so users can keep one clean conversation while still asking for quick explanations of difficult words or concepts. The platform also supports code help, file analysis, and multiple AI backends for different kinds of tasks.</p>
+    </div>
     
     <h2>Contact</h2>
-    <p>We are constantly improving Samba AI. If you have any feedback or questions, please visit our <a href="/contact.html">Contact Us</a> page.</p>
+    <div class="card">
+        <p>We are constantly improving Samba AI. If you have any feedback or questions, please visit our <a href="/contact.html">Contact Us</a> page.</p>
+    </div>
 </body>
 </html>

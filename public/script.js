@@ -566,12 +566,47 @@ function enhanceCodeBlocks(containerDiv) {
   });
 }
 
+function getAvatarHTML(role) {
+  if (role === 'user') {
+    return `<div class="message-avatar user-avatar" title="${getUserInitial()}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>`;
+  } else {
+    return `<div class="message-avatar assistant-avatar" style="background: var(--accent); color: white;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M12 2v2M7 11V7a5 5 0 0 1 10 0v4M8 16h.01M16 16h.01"/>
+      </svg>
+    </div>`;
+  }
+}
+
+function getMiniAvatarHTML(role) {
+  if (role === 'user') {
+    return `<div class="mini-message-avatar user-avatar" title="${getUserInitial()}">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>`;
+  } else {
+    return `<div class="mini-message-avatar assistant-avatar" style="background: var(--accent); color: white;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M12 2v2M7 11V7a5 5 0 0 1 10 0v4M8 16h.01M16 16h.01"/>
+      </svg>
+    </div>`;
+  }
+}
+
 function appendMessage(role, content) {
   const wrapper = document.createElement('div');
   wrapper.className = `message-wrapper ${role}-wrapper`;
   const div = document.createElement('div');
   div.className = `message ${role}`;
-  const avatarLabel = role === 'user' ? getUserInitial() : 'AI';
 
   wrapper.dataset.originalContent = content; // store raw content for regenerate
 
@@ -595,7 +630,7 @@ function appendMessage(role, content) {
   }
 
   div.innerHTML = `
-    <div class="message-avatar">${avatarLabel}</div>
+    ${getAvatarHTML(role)}
     <div class="message-content">${formatContent(mainContent)}</div>
   `;
   wrapper.appendChild(div);
@@ -752,7 +787,7 @@ function showTypingIndicator() {
   div.className = 'typing-indicator';
   div.id = 'typingIndicator';
   div.innerHTML = `
-    <div class="message-avatar" style="background: var(--accent); color: white;">AI</div>
+    ${getAvatarHTML('assistant')}
     <div class="typing-dots">
       <span></span><span></span><span></span>
     </div>
@@ -1018,9 +1053,8 @@ function appendMiniMessage(role, content) {
 
   const div = document.createElement('div');
   div.className = `mini-message ${role}`;
-  const avatarLabel = role === 'user' ? getUserInitial() : '?';
   div.innerHTML = `
-    <div class="mini-message-avatar">${avatarLabel}</div>
+    ${getMiniAvatarHTML(role)}
     <div class="mini-message-content">${formatContent(content)}</div>
   `;
   
@@ -1036,7 +1070,7 @@ function showMiniTyping() {
   div.className = 'mini-typing';
   div.id = 'miniTypingIndicator';
   div.innerHTML = `
-    <div class="mini-message-avatar" style="background: var(--accent); color: white; font-size: 10px;">?</div>
+    ${getMiniAvatarHTML('assistant')}
     <div class="mini-typing-dots">
       <span></span><span></span><span></span>
     </div>
@@ -1800,7 +1834,7 @@ function showImageLoadingAnimation() {
   const div = document.createElement('div');
   div.className = 'message assistant';
   div.innerHTML = `
-    <div class="message-avatar">S</div>
+    ${getAvatarHTML('assistant')}
     <div class="message-content">
       <div class="image-generating-card">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>

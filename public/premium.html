@@ -439,9 +439,72 @@
         padding: 22px;
       }
     }
+
+    /* ===== DARK THEME OVERRIDES ===== */
+    body.dark-theme {
+      --bg: #0A0A0A;
+      --panel: #111111;
+      --panel-soft: rgba(255, 255, 255, 0.04);
+      --text: #F4F4F5;
+      --muted: #A1A1AA;
+      --border: rgba(255, 255, 255, 0.08);
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+      --primary: #8B5CF6;
+      --primary-2: #A78BFA;
+      background:
+        radial-gradient(circle at top left, rgba(139, 92, 246, 0.08), transparent 35%),
+        radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 30%),
+        #000000 !important;
+    }
+    body.dark-theme .hero-card,
+    body.dark-theme .summary-card,
+    body.dark-theme .plan-card {
+      background: rgba(10, 10, 10, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+    }
+    body.dark-theme .plan-highlight {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    body.dark-theme .secondary-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    body.dark-theme .secondary-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+    body.dark-theme .status-pill {
+      background: rgba(20, 20, 20, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    body.dark-theme .summary-list li {
+      background: rgba(255, 255, 255, 0.02);
+    }
   </style>
 </head>
 <body>
+  <script>
+    (function() {
+      try {
+        const saved = localStorage.getItem('smartai_settings');
+        let theme = 'dark';
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && parsed.theme) {
+            theme = parsed.theme;
+          }
+        }
+        if (theme === 'light') {
+          document.body.classList.add('light-theme');
+          document.body.classList.remove('dark-theme');
+        } else {
+          document.body.classList.add('dark-theme');
+          document.body.classList.remove('light-theme');
+        }
+      } catch(e) {}
+    })();
+  </script>
   <div class="page">
     <div class="topbar">
       <a href="/" class="back-link">
