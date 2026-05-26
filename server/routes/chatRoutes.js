@@ -18,20 +18,21 @@ async function getOwnedChat(req, chatId) {
 async function getModeAccess(req) {
   const userId = getUserIdFromReq(req) || req.session?.userId;
   if (!userId) {
-    return { unrestricted: false, truth: false };
+    return { unrestricted: false, truth: false, isAdmin: false };
   }
 
   const user = await db.getUserById(userId);
   const adminEmail = process.env.ADMIN_EMAIL || 'prudhvisiva03@gmail.com';
   const isAdmin = !!(user && user.email === adminEmail);
   if (isAdmin) {
-    return { unrestricted: true, truth: true };
+    return { unrestricted: true, truth: true, isAdmin: true };
   }
 
   const isPremium = await db.isPremiumActive(userId);
   return {
     unrestricted: isPremium,
-    truth: isPremium && user?.planType === 'truth'
+    truth: isPremium && user?.planType === 'truth',
+    isAdmin: false
   };
 }
 
@@ -163,12 +164,19 @@ router.post('/:id/messages', async (req, res) => {
     }
 
     const modeAccess = await getModeAccess(req);
-    const history = await db.getMessages(chatId);
+    // ADMIN AUTO-UNRESTRICTED: If user is admin, bypass frontend toggle entirely.
+    // Admin always gets full unrestricted + truth access without needing to enable it in UI.
+    const effectiveUnrestricted = modeAccess.isAdmin ? true : !!(unrestrictedMode && modeAccess.unrestricted);
+    const effectiveTruth = modeAccess.isAdmin ? true : !!(truthMode && modeAccess.truth);
+
+    // FIX BUG #4: Pass history without the current user message
+    const fullHistory = await db.getMessages(chatId);
+    const history = fullHistory.slice(0, -1);
     const aiText = await generateMainResponse(cleanContent, history, {
       model: model || 'smart-ai-1',
       customInstructions: customInstructions || '',
-      unrestrictedMode: !!(unrestrictedMode && modeAccess.unrestricted),
-      truthMode: !!(truthMode && modeAccess.truth),
+      unrestrictedMode: effectiveUnrestricted,
+      truthMode: effectiveTruth,
       deepResearch: !!deepResearch
     });
 

@@ -57,7 +57,8 @@ router.get('/dev-login', async (req, res) => {
     req.session.userId = user.id;
     res.redirect('/');
   } catch (err) {
-    res.status(500).json({ error: 'Dev login failed' });
+    console.error('[auth] Dev login error:', err);
+    res.status(500).json({ error: 'Dev login failed: ' + err.message });
   }
 });
 

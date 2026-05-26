@@ -18,20 +18,21 @@ async function getOwnedChat(req, chatId) {
 async function getModeAccess(req) {
   const userId = getUserIdFromReq(req) || req.session?.userId;
   if (!userId) {
-    return { unrestricted: false, truth: false };
+    return { unrestricted: false, truth: false, isAdmin: false };
   }
 
   const user = await db.getUserById(userId);
   const adminEmail = process.env.ADMIN_EMAIL || 'prudhvisiva03@gmail.com';
   const isAdmin = !!(user && user.email === adminEmail);
   if (isAdmin) {
-    return { unrestricted: true, truth: true };
+    return { unrestricted: true, truth: true, isAdmin: true };
   }
 
   const isPremium = await db.isPremiumActive(userId);
   return {
     unrestricted: isPremium,
-    truth: isPremium && user?.planType === 'truth'
+    truth: isPremium && user?.planType === 'truth',
+    isAdmin: false
   };
 }
 
@@ -73,12 +74,16 @@ router.post('/:id/mini-messages', async (req, res) => {
     ]);
 
     const modeAccess = await getModeAccess(req);
+    // Admin auto-unrestricted: same as chatRoutes
+    const effectiveUnrestricted = modeAccess.isAdmin ? true : !!(unrestrictedMode && modeAccess.unrestricted);
+    const effectiveTruth = modeAccess.isAdmin ? true : !!(truthMode && modeAccess.truth);
+
     const aiText = await generateHelpResponse(
       cleanContent,
       miniHistory,
       mainMessages,
-      !!(unrestrictedMode && modeAccess.unrestricted),
-      !!(truthMode && modeAccess.truth)
+      effectiveUnrestricted,
+      effectiveTruth
     );
     const aiMsg = await db.addMiniMessage(chatId, 'assistant', aiText);
 

@@ -10,12 +10,25 @@ const pool = new Pool({
   connectionTimeoutMillis: 5000
 });
 
-// Test connection on startup
-pool.query('SELECT NOW()').then(() => {
-  console.log('[DB] Connected to Supabase PostgreSQL ✅');
-}).catch(err => {
-  console.error('[DB] Connection failed:', err.message);
-});
+// Test connection and auto-migrate schema if needed
+pool.query('SELECT NOW()')
+  .then(async () => {
+    console.log('[DB] Connected to Supabase PostgreSQL ✅');
+    try {
+      await pool.query(`
+        ALTER TABLE users 
+        ADD COLUMN IF NOT EXISTS plan_type VARCHAR(50) DEFAULT 'free',
+        ADD COLUMN IF NOT EXISTS premium_expiry VARCHAR(100) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS premium_activated_at VARCHAR(100) DEFAULT NULL;
+      `);
+      console.log('[DB] Database schema check & auto-migrations passed ✅');
+    } catch (err) {
+      console.error('[DB] Auto-migration warning:', err.message);
+    }
+  })
+  .catch(err => {
+    console.error('[DB] Connection failed:', err.message);
+  });
 
 // ===== User Operations =====
 

@@ -711,7 +711,16 @@ async function regenerateLastResponse() {
   showTypingIndicator();
 
   try {
-    const result = await API.sendMessage(currentChatId, lastUserContent);
+    // FIX BUG #7: Pass current model and settings so regenerate respects user's chosen model
+    const result = await API.sendMessage(
+      currentChatId,
+      lastUserContent,
+      settings.currentModel,
+      settings.customInstructions,
+      settings.unrestrictedMode,
+      settings.truthMode,
+      isDeepResearchEnabled
+    );
     removeTypingIndicator();
     isMainTyping = false;
 
