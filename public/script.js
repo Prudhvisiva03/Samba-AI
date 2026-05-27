@@ -602,6 +602,99 @@ function getMiniAvatarHTML(role) {
   }
 }
 
+// ===== Smart Hint Auto-Highlights (Idea 1) =====
+const TECH_DICTIONARY = [
+  'closure', 'closures', 'callback', 'callbacks', 'promise', 'promises', 'async', 'await', 
+  'recursion', 'middleware', 'nosql', 'database', 'databases', 'inheritance', 'polymorphism', 
+  'encapsulation', 'jwt', 'token', 'tokens', 'session', 'sessions', 'cookie', 'cookies', 
+  'cors', 'threading', 'threads', 'socket', 'sockets', 'compiler', 'interpreter', 
+  'vulnerability', 'vulnerabilities', 'hacker', 'ethical hacking', 'cryptography', 
+  'encryption', 'decryption', 'rest api', 'api', 'apis', 'restful', 'index', 'indexes', 
+  'buffer overflow', 'sql injection', 'cross-site scripting', 'xss', 'rce', 'privilege escalation',
+  'pointer', 'pointers', 'memory leak', 'garbage collection', 'deadlock', 'semaphore',
+  'kali linux', 'nmap', 'metasploit', 'ollama'
+];
+
+function openMiniChatWithQuery(queryText) {
+  if (!miniChat.classList.contains('open')) {
+    miniChatToggle.click();
+  }
+  miniMessageInput.value = queryText;
+  autoResizeTextarea(miniMessageInput);
+  updateMiniSendBtnState();
+  setTimeout(() => {
+    sendMiniMessage();
+  }, 350);
+}
+
+function highlightTechnicalTerms(rootElement) {
+  if (!rootElement) return;
+  const walk = document.createTreeWalker(
+    rootElement,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: function(node) {
+        let parent = node.parentNode;
+        while (parent && parent !== rootElement) {
+          const tag = parent.tagName.toLowerCase();
+          if (tag === 'pre' || tag === 'code' || tag === 'a' || parent.classList.contains('hint-term')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          parent = parent.parentNode;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+  );
+
+  const textNodes = [];
+  let currentNode;
+  while ((currentNode = walk.nextNode())) {
+    textNodes.push(currentNode);
+  }
+
+  const sortedDict = [...TECH_DICTIONARY].sort((a, b) => b.length - a.length);
+  const pattern = new RegExp('\\b(' + sortedDict.join('|') + ')\\b', 'gi');
+
+  textNodes.forEach(node => {
+    const text = node.nodeValue;
+    if (!pattern.test(text)) return;
+
+    pattern.lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    let match;
+
+    const tempText = text;
+    while ((match = pattern.exec(tempText)) !== null) {
+      const matchText = match[0];
+      const matchIndex = match.index;
+
+      if (matchIndex > lastIndex) {
+        fragment.appendChild(document.createTextNode(tempText.substring(lastIndex, matchIndex)));
+      }
+
+      const span = document.createElement('span');
+      span.className = 'hint-term';
+      span.textContent = matchText;
+      span.title = `Click to explain "${matchText}" in Help Assistant`;
+      span.addEventListener('click', () => {
+        const query = `Explain the term "${matchText}" in simple words, and give a short practical example.`;
+        openMiniChatWithQuery(query);
+      });
+      fragment.appendChild(span);
+
+      lastIndex = pattern.lastIndex;
+    }
+
+    if (lastIndex < tempText.length) {
+      fragment.appendChild(document.createTextNode(tempText.substring(lastIndex)));
+    }
+
+    node.parentNode.replaceChild(fragment, node);
+  });
+}
+
 function appendMessage(role, content) {
   const wrapper = document.createElement('div');
   wrapper.className = `message-wrapper ${role}-wrapper`;
@@ -638,6 +731,7 @@ function appendMessage(role, content) {
   // Parse code blocks to add header and copy buttons
   if (role === 'assistant') {
     enhanceCodeBlocks(div);
+    highlightTechnicalTerms(div.querySelector('.message-content'));
   }
 
   // Action buttons

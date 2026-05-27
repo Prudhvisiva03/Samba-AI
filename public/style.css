@@ -2366,6 +2366,20 @@ body.font-large .mini-message-content {
   filter: brightness(1.1);
 }
 
+/* Clickable Hint Terms in Main Chat responses */
+.hint-term {
+  border-bottom: 2px dotted var(--accent);
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 4px;
+  transition: background-color var(--transition-speed), color var(--transition-speed);
+  font-weight: 500;
+}
+.hint-term:hover {
+  background-color: rgba(139, 92, 246, 0.12);
+  color: var(--accent);
+}
+
 /* AI Generated Markdown Image Styling */
 .message-content img {
   max-width: 100%;
