@@ -2380,6 +2380,36 @@ body.font-large .mini-message-content {
   color: var(--accent);
 }
 
+/* Voice Input Microphone Button */
+.voice-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--color-transition);
+  margin-right: 8px;
+  align-self: center;
+}
+.voice-btn:hover {
+  color: var(--accent);
+  background: var(--bg-hover);
+}
+.voice-btn.listening {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.15);
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
 /* AI Generated Markdown Image Styling */
 .message-content img {
   max-width: 100%;

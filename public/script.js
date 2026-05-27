@@ -755,8 +755,45 @@ function appendMessage(role, content) {
   });
   actions.appendChild(copyBtn);
 
-  // Regenerate button (only for assistant messages)
+  // Speak & Regenerate buttons (only for assistant messages)
   if (role === 'assistant') {
+    // Speak (Text-to-Speech) button
+    const speakBtn = document.createElement('button');
+    speakBtn.className = 'msg-action-btn';
+    speakBtn.title = 'Read aloud';
+    speakBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+    
+    let isSpeaking = false;
+    speakBtn.addEventListener('click', () => {
+      if (isSpeaking) {
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+        speakBtn.classList.remove('speaking');
+        speakBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+      } else {
+        window.speechSynthesis.cancel(); // Stop any active speech
+        const cleanText = mainContent.replace(/[#*`_~]/g, ''); // strip markdown syntax
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        // Auto-detect Telugu vs English
+        const hasTelugu = /[\u0c00-\u0c7f]/i.test(cleanText);
+        utterance.lang = hasTelugu ? 'te-IN' : 'en-US';
+        
+        utterance.onend = () => {
+          isSpeaking = false;
+          speakBtn.classList.remove('speaking');
+          speakBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+        };
+        
+        isSpeaking = true;
+        speakBtn.classList.add('speaking');
+        // SVG with line to indicate "Mute"
+        speakBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>`;
+        window.speechSynthesis.speak(utterance);
+      }
+    });
+    actions.appendChild(speakBtn);
+
     const regenBtn = document.createElement('button');
     regenBtn.className = 'msg-action-btn';
     regenBtn.title = 'Regenerate';
@@ -1756,6 +1793,98 @@ function formatContent(text) {
   return html;
 }
 
+// ===== Voice Input (Idea 2) =====
+function setupVoiceInput() {
+  const inputContainer = document.querySelector('.input-container');
+  const sendBtn = document.getElementById('sendBtn');
+  const messageInput = document.getElementById('messageInput');
+  
+  if (!inputContainer || !sendBtn || !messageInput) return;
+  
+  // Create microphone button
+  const voiceBtn = document.createElement('button');
+  voiceBtn.className = 'voice-btn';
+  voiceBtn.id = 'voiceBtn';
+  voiceBtn.title = 'Voice input';
+  voiceBtn.type = 'button';
+  voiceBtn.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+      <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+      <line x1="12" y1="19" x2="12" y2="23"></line>
+      <line x1="8" y1="23" x2="16" y2="23"></line>
+    </svg>
+  `;
+  
+  // Insert voiceBtn before sendBtn
+  inputContainer.insertBefore(voiceBtn, sendBtn);
+  
+  // Speech Recognition API
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    voiceBtn.style.display = 'none'; // Hide if browser doesn't support it
+    return;
+  }
+  
+  const recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+  
+  let isListening = false;
+  
+  voiceBtn.addEventListener('click', () => {
+    if (isListening) {
+      recognition.stop();
+    } else {
+      // Auto-detect lang setting
+      const lang = (settings.lang === 'te') ? 'te-IN' : 'en-US';
+      recognition.lang = lang;
+      
+      try {
+        recognition.start();
+      } catch (err) {
+        console.error('Speech recognition start failed:', err);
+      }
+    }
+  });
+  
+  recognition.onstart = () => {
+    isListening = true;
+    voiceBtn.classList.add('listening');
+    voiceBtn.title = 'Listening... Click to stop';
+    showToast('Voice input started... Speak now! 🎙️');
+  };
+  
+  recognition.onend = () => {
+    isListening = false;
+    voiceBtn.classList.remove('listening');
+    voiceBtn.title = 'Voice input';
+  };
+  
+  recognition.onerror = (e) => {
+    console.error('Speech recognition error:', e.error);
+    isListening = false;
+    voiceBtn.classList.remove('listening');
+    if (e.error === 'not-allowed') {
+      showToast('Microphone access denied. Please enable mic permissions.');
+    } else {
+      showToast('Voice input failed.');
+    }
+  };
+  
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    if (transcript) {
+      const prevText = messageInput.value.trim();
+      messageInput.value = prevText ? `${prevText} ${transcript}` : transcript;
+      messageInput.focus();
+      autoResizeTextarea(messageInput);
+      sendBtn.disabled = false;
+    }
+  };
+}
+
 // ===== Initialize =====
 async function init() {
   try {
@@ -1785,6 +1914,7 @@ async function init() {
     chats = await API.getChats();
     renderChatList();
     showWelcome();
+    setupVoiceInput();
   } catch (err) {
     console.error('Failed to initialize:', err);
     chatList.innerHTML = '<div style="padding: 16px 12px; color: #e88; font-size: 13px; text-align: center;">\u26a0\ufe0f Failed to load. Refresh the page.</div>';
