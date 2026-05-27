@@ -2410,6 +2410,27 @@ body.font-large .mini-message-content {
   100% { transform: scale(1); }
 }
 
+/* Live Playground Code Run Button */
+.code-run-btn {
+  background: rgba(34, 197, 94, 0.12) !important;
+  color: #22c55e !important;
+  border: 1px solid rgba(34, 197, 94, 0.25) !important;
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: var(--color-transition);
+  margin-right: 8px;
+}
+.code-run-btn:hover {
+  background: rgba(34, 197, 94, 0.22) !important;
+  filter: brightness(1.1);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.2);
+}
+
 /* AI Generated Markdown Image Styling */
 .message-content img {
   max-width: 100%;

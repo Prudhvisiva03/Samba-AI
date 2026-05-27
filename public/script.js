@@ -517,10 +517,125 @@ function renderMessages(messages) {
   scrollToBottom(chatArea);
 }
 
+function openCodePlayground(code, language) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay open';
+  overlay.style.zIndex = '9999';
+  
+  const modal = document.createElement('div');
+  modal.className = 'modal modal-lg';
+  modal.style.width = '90%';
+  modal.style.maxWidth = '1000px';
+  modal.style.height = '85vh';
+  modal.style.display = 'flex';
+  modal.style.flexDirection = 'column';
+  
+  modal.innerHTML = `
+    <div class="modal-header">
+      <h2>💻 Live Code Playground</h2>
+      <button class="modal-close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body" style="flex: 1; display: flex; flex-direction: column; padding: 16px; overflow: hidden; background: #1a1a1a;">
+      <iframe id="playgroundIframe" sandbox="allow-scripts" style="flex: 1; width: 100%; border: 1px solid #333; border-radius: 8px; background: white;"></iframe>
+    </div>
+  `;
+  
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  
+  const closeBtn = modal.querySelector('.modal-close');
+  closeBtn.addEventListener('click', () => {
+    overlay.remove();
+  });
+  
+  const iframe = modal.querySelector('#playgroundIframe');
+  let srcDocContent = '';
+  const cleanLang = language.toLowerCase();
+  
+  if (cleanLang === 'html') {
+    srcDocContent = code;
+  } else if (cleanLang === 'js' || cleanLang === 'javascript') {
+    srcDocContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>JS Console Preview</title>
+        <style>
+          body { font-family: monospace; padding: 20px; background: #0f0f0f; color: #00ff00; font-size: 14px; line-height: 1.5; }
+          .log { border-bottom: 1px solid #222; padding: 8px 0; }
+          .error { color: #ff3333; }
+          .info { color: #33b5e5; }
+        </style>
+      </head>
+      <body>
+        <h3>Console Outputs:</h3>
+        <div id="consoleOut"></div>
+        <script>
+          const out = document.getElementById('consoleOut');
+          function logToScreen(msg, type = 'log') {
+            const div = document.createElement('div');
+            div.className = 'log ' + type;
+            div.textContent = typeof msg === 'object' ? JSON.stringify(msg) : msg;
+            out.appendChild(div);
+          }
+          window.console.log = function(...args) {
+            logToScreen(args.join(' '));
+          };
+          window.console.error = function(...args) {
+            logToScreen(args.join(' '), 'error');
+          };
+          window.onerror = function(msg, url, line) {
+            logToScreen('ERROR: ' + msg + ' on line ' + line, 'error');
+          };
+          logToScreen('Starting script execution...', 'info');
+        </script>
+        <script>
+          try {
+            ${code}
+            logToScreen('Script executed successfully with no crashes.', 'info');
+          } catch(err) {
+            console.error(err.message);
+          }
+        </script>
+      </body>
+      </html>
+    `;
+  } else if (cleanLang === 'css') {
+    srcDocContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>CSS Preview</title>
+        <style>${code}</style>
+        <style>
+          body { font-family: sans-serif; padding: 20px; color: #333; }
+          .preview-box { border: 2px dashed #999; padding: 20px; border-radius: 8px; margin-top: 10px; }
+        </style>
+      </head>
+      <body>
+        <h3>CSS Live Styling Preview:</h3>
+        <div class="preview-box">
+          <h1>This is a Heading (h1)</h1>
+          <h2>This is a Subheading (h2)</h2>
+          <p>This is a standard paragraph (p) containing some <strong>bold text</strong> and <a href="#">a link</a>.</p>
+          <button class="btn">Sample Button</button>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+  
+  iframe.srcdoc = srcDocContent;
+}
+
 function enhanceCodeBlocks(containerDiv) {
   const preEls = containerDiv.querySelectorAll('pre');
   preEls.forEach(pre => {
-    // If it's already wrapped (e.g. some internal glitch), skip
     if (pre.parentNode.classList.contains('code-container')) return;
     
     const container = document.createElement('div');
@@ -537,10 +652,12 @@ function enhanceCodeBlocks(containerDiv) {
     header.className = 'code-header';
     header.innerHTML = `
       <span class="code-lang">${lang}</span>
-      <button class="code-copy-btn" title="Copy code">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        <span style="font-size: 12px; margin-left: 4px;">Copy Code</span>
-      </button>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button class="code-copy-btn" title="Copy code">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span style="font-size: 12px; margin-left: 4px;">Copy Code</span>
+        </button>
+      </div>
     `;
 
     const copyBtn = header.querySelector('.code-copy-btn');
@@ -559,6 +676,24 @@ function enhanceCodeBlocks(containerDiv) {
         }, 2000);
       });
     });
+
+    // Inject Run Code button if runnable
+    const runnableLangs = ['html', 'js', 'javascript', 'css'];
+    if (runnableLangs.includes(lang.toLowerCase())) {
+      const runBtn = document.createElement('button');
+      runBtn.className = 'code-run-btn';
+      runBtn.title = 'Run code';
+      runBtn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span style="font-size: 12px; margin-left: 4.5px;">Run Code</span>
+      `;
+      runBtn.addEventListener('click', () => {
+        const codeText = codeEl ? codeEl.textContent : pre.textContent;
+        openCodePlayground(codeText, lang);
+      });
+      // Insert in the button container
+      header.querySelector('div').insertBefore(runBtn, copyBtn);
+    }
 
     pre.parentNode.insertBefore(container, pre);
     container.appendChild(header);
