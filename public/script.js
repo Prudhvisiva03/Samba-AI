@@ -1795,6 +1795,22 @@ function updateUserUI() {
     const isPro = currentUser.isPremium && (currentUser.planType === 'pro' || currentUser.planType === 'truth');
     const isTruth = currentUser.isPremium && currentUser.planType === 'truth';
 
+    const upgradeBtnText = document.getElementById('upgradeBtnText');
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    const userProfile = document.getElementById('userProfile');
+
+    if (currentUser.isPremium || isAdmin) {
+      if (upgradeBtnText) upgradeBtnText.textContent = 'Premium Active ✨';
+      if (upgradeBtn) upgradeBtn.classList.add('premium-active');
+      if (userAvatar) userAvatar.classList.add('premium-glow');
+      if (userProfile) userProfile.classList.add('premium-glow-profile');
+    } else {
+      if (upgradeBtnText) upgradeBtnText.textContent = 'Upgrade Plans';
+      if (upgradeBtn) upgradeBtn.classList.remove('premium-active');
+      if (userAvatar) userAvatar.classList.remove('premium-glow');
+      if (userProfile) userProfile.classList.remove('premium-glow-profile');
+    }
+
     if (isPro || isAdmin) {
       securityModeContainer.style.display = 'flex';
     } else {
@@ -1821,6 +1837,14 @@ function updateUserUI() {
     settings.truthMode = false;
     unrestrictedModeToggle.checked = false;
     truthModeToggle.checked = false;
+
+    const upgradeBtnText = document.getElementById('upgradeBtnText');
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    const userProfile = document.getElementById('userProfile');
+    if (upgradeBtnText) upgradeBtnText.textContent = 'Upgrade Plans';
+    if (upgradeBtn) upgradeBtn.classList.remove('premium-active');
+    if (userAvatar) userAvatar.classList.remove('premium-glow');
+    if (userProfile) userProfile.classList.remove('premium-glow-profile');
   }
 
   // Reload chats for this account (critical for user-scoped history)

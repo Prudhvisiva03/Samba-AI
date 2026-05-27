@@ -2431,6 +2431,40 @@ body.font-large .mini-message-content {
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.2);
 }
 
+/* Premium Subscription Golden UI Glow (Idea 4) */
+.user-avatar.premium-glow {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b) !important;
+  color: #000000 !important;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+  position: relative;
+}
+.user-profile.premium-glow-profile {
+  border: 1px solid rgba(251, 191, 36, 0.2) !important;
+  background: rgba(251, 191, 36, 0.04) !important;
+  transition: var(--color-transition);
+}
+.user-profile.premium-glow-profile:hover {
+  border-color: rgba(251, 191, 36, 0.4) !important;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.08);
+}
+.upgrade-btn.premium-active {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b) !important;
+  color: #000000 !important;
+  border: none !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3) !important;
+  animation: golden-pulse 3s infinite ease-in-out;
+}
+.upgrade-btn.premium-active:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+@keyframes golden-pulse {
+  0% { box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3); }
+  50% { box-shadow: 0 4px 25px rgba(251, 191, 36, 0.6); }
+  100% { box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3); }
+}
+
 /* AI Generated Markdown Image Styling */
 .message-content img {
   max-width: 100%;
