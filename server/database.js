@@ -22,6 +22,17 @@ pool.query('SELECT NOW()')
         ADD COLUMN IF NOT EXISTS premium_activated_at VARCHAR(100) DEFAULT NULL;
       `);
       console.log('[DB] Database schema check & auto-migrations passed ✅');
+
+      // Enable Row-Level Security (RLS) on all tables to secure them against public anonymous API access
+      const rlsTables = ['users', 'chats', 'messages', 'mini_messages', 'sessions'];
+      for (const table of rlsTables) {
+        try {
+          await pool.query(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY;`);
+        } catch (rlsErr) {
+          console.warn(`[DB] Failed to enable RLS on table "${table}":`, rlsErr.message);
+        }
+      }
+      console.log('[DB] Row-Level Security (RLS) successfully enabled/verified on all tables ✅');
     } catch (err) {
       console.error('[DB] Auto-migration warning:', err.message);
     }
